@@ -48,7 +48,22 @@ git branch -M master
 git push -u origin master
 ```
 
-## Step 6 — add shell alias
+## Step 6 — add to jail .gitignore
+
+Append the project name to `/workspace/.gitignore` under the cloned projects section:
+
+```bash
+echo "<name>/" >> /workspace/.gitignore
+```
+
+Then commit the change inside the jail repo:
+
+```bash
+git -C /workspace add .gitignore && git -C /workspace commit -m "Ignore <name>/"
+git -C /workspace push
+```
+
+## Step 7 — add shell alias
 
 Append to `/workspace/.aliases` (creates the file if missing):
 
@@ -64,6 +79,6 @@ Then tell the user:
 > ```
 > Then reload: `source ~/.zshrc`
 
-## Step 7 — done
+## Step 8 — done
 
 Confirm what was created: repo URL, local path, and alias name.
