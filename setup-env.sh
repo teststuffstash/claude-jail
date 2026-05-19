@@ -30,6 +30,8 @@ OVERRIDE="$DIR/docker-compose.override.yml"
 {
   echo "services:"
   echo "  claude:"
+  echo "    environment:"
+  echo "      TZ: ${TZ:-Europe/Tallinn}"
   echo "    volumes:"
   [ -f "$HOME/.zshrc" ]      && echo "      - $HOME/.zshrc:/home/node/.zshrc:ro"
   [ -d "$HOME/.oh-my-zsh" ]  && echo "      - $HOME/.oh-my-zsh:/home/node/.oh-my-zsh"
