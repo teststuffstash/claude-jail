@@ -5,6 +5,7 @@ set -u
 
 input=$(cat)
 model=$(jq -r '.model.id // "?"' <<<"$input")
+five_pct=$(jq -r '.rate_limits.five_hour.used_percentage // ""' <<<"$input")
 five_reset=$(jq -r '.rate_limits.five_hour.resets_at // ""' <<<"$input")
 seven_pct=$(jq -r '.rate_limits.seven_day.used_percentage // ""' <<<"$input")
 seven_reset=$(jq -r '.rate_limits.seven_day.resets_at // ""' <<<"$input")
@@ -55,8 +56,12 @@ else
   echo "$fivh" > "$fivh_cache" 2>/dev/null || true
 fi
 
-# Override per plan: Pro ~200k, Max5x ~880k, Max20x ~3.5M.
-fivh_max="${CLAUDE_5H_LIMIT:-200000}"
+# Derive actual limit from API percentage; fall back to env override or 200k.
+if [[ -n "$five_pct" && "$five_pct" != "null" && "$five_pct" != "0" && "$fivh" -gt 0 ]]; then
+  fivh_max=$(awk -v t="$fivh" -v p="$five_pct" 'BEGIN { printf "%d", t * 100 / p }')
+else
+  fivh_max="${CLAUDE_5H_LIMIT:-200000}"
+fi
 
 fmt_left() {
   local resets_at="$1"
