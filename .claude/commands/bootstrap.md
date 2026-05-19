@@ -47,6 +47,20 @@ git config --global user.email "<value>"
 git config --global user.name "<value>"
 ```
 
+### Shell aliases
+
+Check whether `~/Projects/.aliases` is sourced from the host `~/.zshrc`:
+
+```bash
+grep -q "Projects/.aliases" /home/node/.zshrc && echo sourced || echo missing
+```
+
+If missing, tell the user to add this to their host `~/.zshrc`:
+
+```bash
+[ -f ~/Projects/.aliases ] && source ~/Projects/.aliases
+```
+
 ### GH_TOKEN
 
 Check whether `GH_TOKEN` is already set in `/workspace/.env`:
