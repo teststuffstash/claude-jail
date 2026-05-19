@@ -1,0 +1,18 @@
+services:
+  claude:
+    build:
+      context: .
+      args:
+        HOST_UID: ${HOST_UID}
+        HOST_GID: ${HOST_GID}
+    working_dir: /workspace
+    volumes:
+      - /home/rasmus/Projects:/workspace
+      - /home/rasmus/Projects/.claude-data:/home/node/.claude
+      - /home/rasmus/Projects/.claude-data.json:/home/node/.claude.json
+    ports:
+      - "54545:54545"
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env

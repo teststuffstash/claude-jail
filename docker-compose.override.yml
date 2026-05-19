@@ -1,0 +1,6 @@
+services:
+  claude:
+    volumes:
+      - /home/rasmus/.zshrc:/home/node/.zshrc:ro
+      - /home/rasmus/.oh-my-zsh:/home/node/.oh-my-zsh
+      - /home/rasmus/Projects/.claude-data.zsh_history:/home/node/.zsh_history
