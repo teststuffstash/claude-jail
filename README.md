@@ -28,6 +28,39 @@ docker compose build
 docker compose run --rm claude
 ```
 
+### 4. GitHub CLI (optional)
+
+GitHub doesn't support pre-selecting fine-grained token permissions via URL, so you'll need to configure these manually.
+
+**First, enable fine-grained PATs in your org:**
+`https://github.com/organizations/teststuffstash/settings/personal-access-tokens`
+→ Allow access via fine-grained personal access tokens
+
+**Then create the token:**
+[Open token creation →](https://github.com/settings/personal-access-tokens/new?description=claude-jail&resource_owner=teststuffstash)
+
+Configure it as follows:
+
+| Field | Value |
+|---|---|
+| Resource owner | `teststuffstash` |
+| Repository access | All repositories |
+| Administration | Read and Write |
+| Contents | Read and Write |
+| Issues | Read and Write |
+| Metadata | Read (auto) |
+| Pull requests | Read and Write |
+| Workflows | Read and Write |
+| Everything else | No access |
+
+Then add it to `.env`:
+
+```bash
+GH_TOKEN=github_pat_...
+```
+
+Repo deletions are recoverable — org owners can restore deleted repos via GitHub settings for 90 days.
+
 ## What's inside
 
 | Path (container) | Path (host) | Notes |

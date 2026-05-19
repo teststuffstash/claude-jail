@@ -3,10 +3,18 @@ set -e
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-cat > "$DIR/.env" <<EOF
-HOST_UID=$(id -u)
-HOST_GID=$(id -g)
-EOF
+set_env() {
+  local key="$1" value="$2" file="$DIR/.env"
+  touch "$file"
+  if grep -q "^${key}=" "$file" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "$file"
+  else
+    echo "${key}=${value}" >> "$file"
+  fi
+}
+
+set_env HOST_UID "$(id -u)"
+set_env HOST_GID "$(id -g)"
 
 # Bind-mounted files must exist on the host before `docker compose run`,
 # otherwise docker creates an empty directory in their place.

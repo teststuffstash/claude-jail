@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Claude Code custom status line: model + context % + 5-hour usage %.
+# stdin = JSON from Claude Code (model.id, transcript_path, etc.).
+set -u
+
+input=$(cat)
+model=$(jq -r '.model.id // "?"' <<<"$input")
+five_reset=$(jq -r '.rate_limits.five_hour.resets_at // ""' <<<"$input")
+seven_pct=$(jq -r '.rate_limits.seven_day.used_percentage // ""' <<<"$input")
+seven_reset=$(jq -r '.rate_limits.seven_day.resets_at // ""' <<<"$input")
+transcript=$(jq -r '.transcript_path // ""' <<<"$input")
+
+# Context tokens: latest "assistant" message's usage block in the active transcript.
+ctx=0
+if [ -n "$transcript" ] && [ -f "$transcript" ]; then
+  ctx=$(tac "$transcript" 2>/dev/null \
+    | awk '/"type":"assistant"/ { print; exit }' \
+    | jq -r '
+        (.message.usage // {})
+        | (.cache_read_input_tokens // 0)
+        + (.cache_creation_input_tokens // 0)
+        + (.input_tokens // 0)
+        + (.output_tokens // 0)
+      ' 2>/dev/null) || ctx=0
+fi
+ctx=${ctx:-0}
+
+# Model context window. 1M variants encode it in the id.
+case "$model" in
+  *1m*|*opus-4-7*) ctx_max=1000000 ;;
+  *)               ctx_max=200000  ;;
+esac
+
+# 5h sum is cached briefly — scanning every project's JSONL on every status
+# refresh would lag the UI.
+fivh_cache="/tmp/claude-5h-tokens.$(id -u)"
+fivh_ttl=30
+now=$(date +%s)
+if [ -f "$fivh_cache" ] && [ $((now - $(stat -c %Y "$fivh_cache" 2>/dev/null || echo 0))) -lt "$fivh_ttl" ]; then
+  fivh=$(cat "$fivh_cache" 2>/dev/null || echo 0)
+else
+  since=$(date -u -d '5 hours ago' +%s 2>/dev/null || date -u -v-5H +%s)
+  since_iso=$(date -u -d '5 hours ago' '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u -v-5H '+%Y-%m-%d %H:%M:%S')
+  fivh=$(find /home/node/.claude/projects -name '*.jsonl' -newermt "$since_iso" 2>/dev/null -print0 \
+    | xargs -0 -r cat 2>/dev/null \
+    | jq -rs --argjson since "$since" '
+        [ .[]
+          | select(.type == "assistant")
+          | select(((.timestamp // "") | sub("\\.[0-9]+Z$"; "Z") | try fromdateiso8601 catch 0) >= $since)
+          | (.message.usage // {})
+          | (.input_tokens // 0) + (.output_tokens // 0)
+        ] | add // 0
+      ' 2>/dev/null) || fivh=0
+  fivh=${fivh:-0}
+  echo "$fivh" > "$fivh_cache" 2>/dev/null || true
+fi
+
+# Override per plan: Pro ~200k, Max5x ~880k, Max20x ~3.5M.
+fivh_max="${CLAUDE_5H_LIMIT:-200000}"
+
+fmt_left() {
+  local resets_at="$1"
+  [[ -z "$resets_at" || "$resets_at" == "null" ]] && return
+  local secs=$(( resets_at - now ))
+  (( secs < 0 )) && secs=0
+  local mins=$(( (secs + 30) / 60 ))
+  if (( mins >= 60 )); then
+    printf '%dh%02dm' $(( mins / 60 )) $(( mins % 60 ))
+  else
+    printf '%dm' "$mins"
+  fi
+}
+
+fmt_when() {
+  local resets_at="$1"
+  [[ -z "$resets_at" || "$resets_at" == "null" ]] && return
+  date -d "@$resets_at" +'%a %H:%M %Z'
+}
+
+fmt() {
+  awk -v n="${1:-0}" 'BEGIN {
+    if (n >= 1000000) printf "%.1fM", n/1000000;
+    else if (n >= 1000) printf "%.1fk", n/1000;
+    else printf "%d", n
+  }'
+}
+pct() {
+  awk -v n="${1:-0}" -v d="${2:-1}" 'BEGIN { if (d+0 == 0) print 0; else printf "%d", (n*100)/d }'
+}
+
+fivh_suffix=""
+left=$(fmt_left "$five_reset")
+[[ -n "$left" ]] && fivh_suffix=" · resets in $left"
+
+out="$model │ ctx $(fmt "$ctx")/$(fmt "$ctx_max") ($(pct "$ctx" "$ctx_max")%) │ 5h $(fmt "$fivh")/$(fmt "$fivh_max") ($(pct "$fivh" "$fivh_max")%)$fivh_suffix"
+
+if [[ -n "$seven_pct" && "$seven_pct" != "null" ]]; then
+  when=$(fmt_when "$seven_reset")
+  seven_pct_int=$(printf '%.0f' "$seven_pct")
+  [[ -n "$when" ]] && out+=" │ 7d ${seven_pct_int}% · resets $when"
+fi
+
+printf '%s' "$out"

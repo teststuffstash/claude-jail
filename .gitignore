@@ -1,1 +1,9 @@
+# secrets
+.env
+
+# machine-specific claude state
+.claude-data/
+.claude-data.*
+.claude/settings.local.json
+
 # cloned projects (add subdirectory names here)
