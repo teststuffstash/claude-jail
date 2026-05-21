@@ -81,7 +81,7 @@ fmt_left() {
 fmt_when() {
   local resets_at="$1"
   [[ -z "$resets_at" || "$resets_at" == "null" ]] && return
-  date -d "@$resets_at" +'%a %H:%M %Z'
+  TZ="${TZ:-Europe/Tallinn}" date -d "@$resets_at" +'%a %H:%M %Z'
 }
 
 fmt() {
