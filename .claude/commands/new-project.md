@@ -16,7 +16,15 @@ cd /workspace/<name>
 git init
 ```
 
-## Step 3 — create CLAUDE.md
+## Step 3 — create .gitignore
+
+Write `/workspace/<name>/.gitignore`:
+
+```
+.idea/
+```
+
+## Step 4 — create CLAUDE.md
 
 Write `/workspace/<name>/CLAUDE.md` with this exact content:
 
@@ -32,23 +40,23 @@ This project is in its early stages. Update this file as the architecture and to
 Running inside a Docker jail — see `/workspace/CLAUDE.md` for container setup, permissions, and available tools.
 ```
 
-## Step 4 — create GitHub repo
+## Step 5 — create GitHub repo
 
 ```bash
 gh repo create teststuffstash/<name> --<public|private>
 ```
 
-## Step 5 — set authenticated remote and push
+## Step 6 — set authenticated remote and push
 
 ```bash
 git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/teststuffstash/<name>.git"
-git add CLAUDE.md
+git add CLAUDE.md .gitignore
 git commit -m "Initial commit"
 git branch -M master
 git push -u origin master
 ```
 
-## Step 6 — add to jail .gitignore
+## Step 7 — add to jail .gitignore
 
 Append the project name to `/workspace/.gitignore` under the cloned projects section:
 
@@ -63,7 +71,7 @@ git -C /workspace add .gitignore && git -C /workspace commit -m "Ignore <name>/"
 git -C /workspace push
 ```
 
-## Step 7 — add shell alias
+## Step 8 — add shell alias
 
 Append to `/workspace/.aliases` (creates the file if missing):
 
@@ -79,6 +87,6 @@ Then tell the user:
 > ```
 > Then reload: `source ~/.zshrc`
 
-## Step 8 — done
+## Step 9 — done
 
 Confirm what was created: repo URL, local path, and alias name.
