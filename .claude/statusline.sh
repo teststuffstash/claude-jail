@@ -5,6 +5,8 @@ set -u
 
 input=$(cat)
 model=$(jq -r '.model.id // "?"' <<<"$input")
+cwd=$(jq -r '.workspace.current_dir // .cwd // ""' <<<"$input")
+session_name=$(jq -r '.session_name // ""' <<<"$input")
 five_pct=$(jq -r '.rate_limits.five_hour.used_percentage // ""' <<<"$input")
 five_reset=$(jq -r '.rate_limits.five_hour.resets_at // ""' <<<"$input")
 seven_pct=$(jq -r '.rate_limits.seven_day.used_percentage // ""' <<<"$input")
@@ -97,7 +99,22 @@ fivh_suffix=""
 left=$(fmt_left "$five_reset")
 [[ -n "$left" ]] && fivh_suffix=" · resets in $left"
 
-out="$model │ ctx $(fmt "$ctx")/$(fmt "$ctx_max") ($(pct "$ctx" "$ctx_max")%) │ 5h $(fmt "$fivh")/$(fmt "$fivh_max") ($(pct "$fivh" "$fivh_max")%)$fivh_suffix"
+# Short CWD label: strip /workspace/ prefix; show "jail" for /workspace itself.
+case "$cwd" in
+  /workspace)    cwd_short="jail" ;;
+  /workspace/*)  cwd_short="${cwd#/workspace/}" ;;
+  "")            cwd_short="" ;;
+  *)             cwd_short="$cwd" ;;
+esac
+
+# Terminal window title: claude · <cwd> [· <session_name>]
+title="claude · $cwd_short"
+[[ -n "$session_name" && "$session_name" != "null" ]] && title+=" · $session_name"
+printf '\033]2;%s\007' "$title"
+
+out=""
+[[ -n "$cwd_short" ]] && out="$cwd_short │ "
+out+="$model │ ctx $(fmt "$ctx")/$(fmt "$ctx_max") ($(pct "$ctx" "$ctx_max")%) │ 5h $(fmt "$fivh")/$(fmt "$fivh_max") ($(pct "$fivh" "$fivh_max")%)$fivh_suffix"
 
 if [[ -n "$seven_pct" && "$seven_pct" != "null" ]]; then
   when=$(fmt_when "$seven_reset")
