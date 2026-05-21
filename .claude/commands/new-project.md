@@ -73,11 +73,15 @@ git -C /workspace push
 
 ## Step 8 — add shell alias
 
-Append to `/workspace/.aliases` (creates the file if missing):
+Append to `/workspace/.aliases` (creates the file if missing). Use a literal heredoc to avoid nested-quote escaping bugs:
 
 ```bash
-echo "alias <name>='docker compose -f ~/Projects/docker-compose.yml run --rm claude zsh -c \"cd /workspace/<name> && exec claude\"'" >> /workspace/.aliases
+cat >> /workspace/.aliases <<'EOF'
+alias <name>='docker compose -f ~/Projects/docker-compose.yml run --rm claude zsh -c "cd /workspace/<name> && exec claude"'
+EOF
 ```
+
+Substitute `<name>` in the heredoc body before running.
 
 Then tell the user:
 
