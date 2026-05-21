@@ -99,10 +99,12 @@ fivh_suffix=""
 left=$(fmt_left "$five_reset")
 [[ -n "$left" ]] && fivh_suffix=" · resets in $left"
 
-# Short CWD label: strip /workspace/ prefix; show "jail" for /workspace itself.
+# CWD label: map container paths back to host-visible paths.
 case "$cwd" in
-  /workspace)    cwd_short="jail" ;;
-  /workspace/*)  cwd_short="${cwd#/workspace/}" ;;
+  /workspace)    cwd_short="~/Projects" ;;
+  /workspace/*)  cwd_short="~/Projects/${cwd#/workspace/}" ;;
+  /home/node)    cwd_short="~" ;;
+  /home/node/*)  cwd_short="~/${cwd#/home/node/}" ;;
   "")            cwd_short="" ;;
   *)             cwd_short="$cwd" ;;
 esac
