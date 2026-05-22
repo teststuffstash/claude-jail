@@ -22,6 +22,7 @@ Write `/workspace/<name>/.gitignore`:
 
 ```
 .idea/
+.claude/settings.local.json
 ```
 
 ## Step 4 — create CLAUDE.md
@@ -39,6 +40,24 @@ This project is in its early stages. Update this file as the architecture and to
 
 Running inside a Docker jail — see `/workspace/CLAUDE.md` for container setup, permissions, and available tools.
 ```
+
+## Step 4b — create local Claude settings
+
+Write `/workspace/<name>/.claude/settings.local.json` so edits inside this project's `.claude/` (slash commands, hooks, settings) don't prompt every time:
+
+```bash
+mkdir -p /workspace/<name>/.claude
+```
+
+```json
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  }
+}
+```
+
+This file is gitignored (see Step 3) — it's a per-machine convenience setting, not shared with the repo.
 
 ## Step 5 — create GitHub repo
 
@@ -77,7 +96,7 @@ Append to `/workspace/.aliases` (creates the file if missing). Use a literal her
 
 ```bash
 cat >> /workspace/.aliases <<'EOF'
-alias <name>='docker compose -f ~/Projects/docker-compose.yml run --rm claude zsh -c "cd /workspace/<name> && exec claude"'
+alias <name>='docker compose -f ~/Projects/docker-compose.yml run --rm --service-ports claude zsh -c "cd /workspace/<name> && exec claude"'
 EOF
 ```
 

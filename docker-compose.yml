@@ -11,12 +11,12 @@ services:
       # uploads/ inbox, set per project in .aliases). Server always on port 8000.
       UPLOAD_DIR: ${UPLOAD_DIR:-/workspace/uploads}
     volumes:
-      - /home/rasmus/Projects:/workspace
-      - /home/rasmus/Projects/.claude-data:/home/node/.claude
-      - /home/rasmus/Projects/.claude-data.json:/home/node/.claude.json
+      - ${HOME}/Projects:/workspace
+      - ${HOME}/Projects/.claude-data:/home/node/.claude
+      - ${HOME}/Projects/.claude-data.json:/home/node/.claude.json
       # Jail-only git identity. Host ~/.gitconfig is deliberately NOT mounted so
       # the jail can use its own author name/email. Edit .claude-data.gitconfig.
-      - /home/rasmus/Projects/.claude-data.gitconfig:/home/node/.gitconfig
+      - ${HOME}/Projects/.claude-data.gitconfig:/home/node/.gitconfig
     # No ports: here on purpose. Each alias in .aliases publishes its own host
     # ports with -p (e.g. -p 8001:8000), so sessions don't collide and only the
     # main jail maps the OAuth port 54545.

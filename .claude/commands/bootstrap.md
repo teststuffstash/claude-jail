@@ -21,7 +21,7 @@ test -f /.dockerenv && echo inside || echo outside
 4. Tell the user:
    > Host setup complete. Start the jail with:
    > ```
-   > docker compose run --rm claude
+   > docker compose run --rm --service-ports claude
    > ```
    > Then run `/bootstrap` again from inside to finish.
 
