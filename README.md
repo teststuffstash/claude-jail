@@ -22,7 +22,9 @@ graph LR
         J3["/home/node/.claude.json"]
         J4["/home/node/.zsh_history"]
         J5["shell config"]
+        TINI(["tini · PID 1"])
         CLAUDE(["claude CLI"])
+        UP["upload server :8000"]
         CB["OAuth listener :54545"]
     end
 
@@ -37,6 +39,9 @@ graph LR
     H4 -- "rw" --> J4
     H5 -- "ro" --> J5
     H6 -. "env vars" .-> CLAUDE
+    TINI -- "spawns" --> CLAUDE
+    TINI -- "spawns (bg)" --> UP
+    BROWSER -- "drag / paste files" --> UP
     CLAUDE -- "1. /login opens" --> BROWSER
     BROWSER -- "2. authenticate" --> AI
     AI -- "3. redirect to localhost:54545" --> BROWSER
@@ -60,19 +65,23 @@ docker compose build
 
 ### 2. Run
 
+Use the `main` alias from `.aliases` (it publishes the upload + OAuth ports):
+
 ```bash
-docker compose run --rm claude
+main   # = docker compose run --rm -p 8000:8000 -p 54545:54545 claude
 ```
+
+For project sessions use the other `.aliases` shortcuts (`car-fleet`, `homelab`, `therapy`) — see [Upload server & ports](#upload-server--ports). Compose itself declares no `ports:`; each alias publishes its own with `-p`.
 
 ### 3. Log in
 
-Inside Claude Code, run:
+From the **main** jail (it's the only session that maps the OAuth callback port `54545`), run:
 
 ```
 /login
 ```
 
-This authenticates via your claude.ai account (Pro or Max). The session is persisted in `~/Projects/.claude-data/`.
+This authenticates via your claude.ai account (Pro or Max). The token is persisted in `~/Projects/.claude-data/` and reused by every other session — you only log in once.
 
 ### 4. GitHub CLI (optional)
 
@@ -115,13 +124,30 @@ Repo deletions are recoverable — org owners can restore deleted repos via GitH
 | `/home/node/.claude/` | `~/Projects/.claude-data/` | Memory, history, settings. |
 | `/home/node/.claude.json` | `~/Projects/.claude-data.json` | Onboarding state (theme, startup count). |
 | `/home/node/.zsh_history` | `~/Projects/.claude-data.zsh_history` | Shell history. |
+| `/home/node/.gitconfig` | `~/Projects/.claude-data.gitconfig` | Jail-only git identity; host `~/.gitconfig` is intentionally not mounted. |
 | `/home/node/.zshrc` | `~/.zshrc` | Read-only. |
 | `/home/node/.oh-my-zsh/` | `~/.oh-my-zsh/` | Read-write (plugin installs persist). |
+
+## Upload server & ports
+
+`tini` runs as PID 1 and auto-starts the file-drop upload server (`tools/upload/upload.py`) in the background before launching `claude` — see `tools/jail-entrypoint.sh`. It lets you paste/drag screenshots and docs from the host into the jail. Dropped files land in each project's gitignored `uploads/` inbox; move them out of `uploads/` to commit. Details in `tools/upload/README.md`.
+
+To run several sessions at once without port clashes, the **container** always serves the upload UI on `8000` while each alias publishes its own **host** port with `-p` (compose declares no `ports:`):
+
+| Session | Upload UI (host) | OAuth (host) |
+|---|---|---|
+| `main` (`~/Projects`) | `localhost:8000` | `54545` ← log in here |
+| car-fleet | `localhost:8001` | — |
+| homelab | `localhost:8002` | — |
+| therapy | `localhost:8003` | — |
+
+The **main** jail runs from `~/Projects` for general/infra work and is the only session that maps the OAuth port, so it's the only one that can complete `/login` (the callback is fixed to `localhost:54545`). The project jails don't publish it at all. Log in once via `main`; the token persists in `.claude-data/` and works in every other session.
 
 ## Re-running
 
 ```bash
-docker compose run --rm claude
+main        # general/infra jail (also where you /login)
+car-fleet   # or homelab / therapy
 ```
 
 No rebuild needed unless you update the `Dockerfile`. Re-run `setup-env.sh` if your zsh dotfiles change.

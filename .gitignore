@@ -10,3 +10,10 @@
 therapy/
 homelab/
 car-fleet/
+
+# upload server inbox (main jail) — move files out to commit them
+/uploads/
+
+# python bytecode (e.g. from the upload tool)
+__pycache__/
+*.pyc

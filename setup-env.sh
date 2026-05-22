@@ -23,6 +23,17 @@ CONFIG_FILE="$HOME/Projects/.claude-data.json"
 ZSH_HIST="$HOME/Projects/.claude-data.zsh_history"
 [ -f "$ZSH_HIST" ] || touch "$ZSH_HIST"
 
+# Jail-only git identity, mounted to /home/node/.gitconfig. Kept separate from
+# the host ~/.gitconfig so jail commits can use a different author if desired.
+GITCONFIG="$HOME/Projects/.claude-data.gitconfig"
+[ -f "$GITCONFIG" ] || cat > "$GITCONFIG" <<'GITCFG'
+# Jail git identity — uncomment and fill in for commits made inside the jail.
+# This file is separate from your host ~/.gitconfig.
+# [user]
+# 	name = Your Name
+# 	email = you@example.com
+GITCFG
+
 # Generate docker-compose.override.yml with whichever zsh dotfiles
 # actually exist on the host. Read-only mounts for configs; RW for history
 # and frameworks (so plugin installs/updates persist).

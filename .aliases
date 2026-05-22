@@ -1,0 +1,11 @@
+# Each alias publishes its own ports with -p (host:container). The upload UI is
+# always container port 8000; the host port differs per session so they can run
+# at once. Only "main" (general/infra work from ~/Projects) maps the OAuth port
+# 54545, so it's the only session that can complete /login — Claude's callback
+# is hard-fixed to localhost:54545. Log in there once; the token persists in
+# .claude-data/ and every other session reuses it. UPLOAD_DIR is each project's
+# gitignored uploads/ inbox; move files out of there to commit them.
+alias main='UPLOAD_DIR=/workspace/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8000:8000 -p 54545:54545 claude'
+alias car-fleet='UPLOAD_DIR=/workspace/car-fleet/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8001:8000 claude zsh -c "cd /workspace/car-fleet && exec claude"'
+alias homelab='UPLOAD_DIR=/workspace/homelab/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8002:8000 claude zsh -c "cd /workspace/homelab && exec claude"'
+alias therapy='UPLOAD_DIR=/workspace/therapy/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8003:8000 claude zsh -c "cd /workspace/therapy && exec claude"'
