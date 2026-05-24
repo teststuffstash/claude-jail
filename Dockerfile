@@ -4,7 +4,7 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends zsh git jq curl gpg tini python3 && \
+    apt-get install -y --no-install-recommends zsh git jq curl gpg tini python3 sudo && \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
     chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
@@ -19,6 +19,11 @@ RUN npm install -g @anthropic-ai/claude-code
 # created in mounted volumes are owned by the host user. Also switch the
 # login shell to zsh.
 RUN usermod -u ${HOST_UID} -s /bin/zsh node && groupmod -g ${HOST_GID} node
+
+# Passwordless sudo for 'node' so software can be apt-installed mid-session.
+RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/node && \
+    chmod 0440 /etc/sudoers.d/node && \
+    visudo -cf /etc/sudoers.d/node
 
 ENV SHELL=/bin/zsh
 

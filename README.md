@@ -50,7 +50,7 @@ graph LR
     CLAUDE -- "fine-grained PAT" --> GH
 ```
 
-Claude runs as a non-root user with your host UID/GID — files created in `/workspace` appear on the host owned by you, no `chown` needed.
+Claude runs as a non-root user with your host UID/GID — files created in `/workspace` appear on the host owned by you, no `chown` needed. The `node` user has passwordless sudo so packages can be installed mid-session (`sudo apt-get install ...`); such installs live only in the container's writable layer and are lost on rebuild, so add anything you want to keep to the `Dockerfile`. Note that since `node` is remapped to host UID/GID, sudo→root inside the container has host-root reach over the mounted `~/Projects`.
 
 ## Bootstrap
 
