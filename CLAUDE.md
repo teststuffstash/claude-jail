@@ -6,6 +6,7 @@ You are running inside a Docker container with full permissions. All actions are
 
 - Container base: `node:22-bookworm` (Debian, running as `node` user remapped to host UID/GID)
 - The `node` user has **passwordless sudo** — install packages directly with `sudo apt-get install ...` (installs are ephemeral; add to the `Dockerfile` to persist them)
+- **Project tooling is Devbox/Nix, not apt.** For per-project CLI tools (tofu, kubectl, talosctl, helm, …) prefer a committed `devbox.json` + `devbox shell` over ephemeral `sudo apt`/`curl` installs. The `/nix` store is bind-mounted from the host, so the same `devbox.json` works in the jail and on the host (and persists across rebuilds). `devbox.lock` is committed for deterministic versions.
 - Workspace: `/workspace` — bind-mounted from the host's `~/Projects` directory (read-write)
 - Memory and session history: persisted at `/home/node/.claude`, bind-mounted to `.claude-data/` on the host
 

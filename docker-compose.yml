@@ -17,6 +17,9 @@ services:
       # Jail-only git identity. Host ~/.gitconfig is deliberately NOT mounted so
       # the jail can use its own author name/email. Edit .claude-data.gitconfig.
       - ${HOME}/Projects/.claude-data.gitconfig:/home/node/.gitconfig
+      # Shared Nix store so Devbox tooling (per-project devbox.json) works identically in
+      # the jail and on the host. Requires Nix/Devbox installed on the host (it provides /nix).
+      - /nix:/nix
     # No ports: here on purpose. Each alias in .aliases publishes its own host
     # ports with -p (e.g. -p 8001:8000), so sessions don't collide and only the
     # main jail maps the OAuth port 54545.

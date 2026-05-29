@@ -4,7 +4,7 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends zsh git jq curl gpg tini python3 sudo && \
+    apt-get install -y --no-install-recommends zsh git jq curl gpg tini python3 sudo xz-utils && \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
     chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
@@ -24,6 +24,15 @@ RUN usermod -u ${HOST_UID} -s /bin/zsh node && groupmod -g ${HOST_GID} node
 RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/node && \
     chmod 0440 /etc/sudoers.d/node && \
     visudo -cf /etc/sudoers.d/node
+
+# Devbox (Jetify): declarative, Nix-backed toolchain shared with the host. Only the
+# devbox binary is baked in — packages resolve from the host's /nix store, which is
+# bind-mounted at runtime (see docker-compose.yml). The same per-project devbox.json
+# then works identically in the jail and on the host. Run `devbox install` on the host
+# to populate the shared store; the jail consumes it via `devbox shell`.
+RUN curl -fsSL https://get.jetify.com/devbox | bash -s -- -f && \
+    chmod 0755 /usr/local/bin/devbox
+ENV PATH="/nix/var/nix/profiles/default/bin:${PATH}"
 
 ENV SHELL=/bin/zsh
 
