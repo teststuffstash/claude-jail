@@ -34,6 +34,15 @@ RUN curl -fsSL https://get.jetify.com/devbox | bash -s -- -f && \
     chmod 0755 /usr/local/bin/devbox
 ENV PATH="/nix/var/nix/profiles/default/bin:${PATH}"
 
+# Nix multi-user build users. devbox's `print-dev-env` (run inside the jail) reads the
+# host's bind-mounted /nix config, which sets build-users-group=nixbld; nix errors out
+# unless that group exists *with members*. These users only satisfy that check — actual
+# builds use the shared host store. Without this, `devbox run`/`devbox shell` fail in the jail.
+RUN groupadd -r nixbld && \
+    for i in 1 2 3 4; do \
+      useradd -r -g nixbld -G nixbld -d /var/empty -s /usr/sbin/nologin -c "Nix build user $i" "nixbld$i"; \
+    done
+
 ENV SHELL=/bin/zsh
 
 COPY tools/jail-entrypoint.sh /usr/local/bin/jail-entrypoint.sh
