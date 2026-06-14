@@ -13,6 +13,17 @@ RUN apt-get update && \
     apt-get update && apt-get install -y --no-install-recommends gh && \
     rm -rf /var/lib/apt/lists/*
 
+# tea — the Forgejo/Gitea CLI, the Forgejo counterpart to gh. No apt repo exists
+# for it, so we pin a release binary and verify its sha256. Kept here (baked into
+# the image, jail-wide) alongside gh on purpose: both are forge CLIs, not
+# per-project tooling. Bump TEA_VERSION + TEA_SHA256 together (checksums at
+# https://dl.gitea.com/tea/<ver>/tea-<ver>-linux-amd64.sha256).
+ARG TEA_VERSION=0.14.1
+ARG TEA_SHA256=3cf7c5d1c20808c9ba2efb9ac125cee10d969daf398e653ea2b33cde201ea317
+RUN curl -fsSL "https://dl.gitea.com/tea/${TEA_VERSION}/tea-${TEA_VERSION}-linux-amd64" -o /usr/local/bin/tea && \
+    echo "${TEA_SHA256}  /usr/local/bin/tea" | sha256sum -c - && \
+    chmod 0755 /usr/local/bin/tea
+
 RUN npm install -g @anthropic-ai/claude-code
 
 # Remap the existing 'node' user/group to match the host UID/GID so files

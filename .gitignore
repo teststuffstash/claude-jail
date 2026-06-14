@@ -10,6 +10,9 @@
 therapy/
 homelab/
 car-fleet/
+idp/
+sleep-tracking/
+snore-recorder/
 
 # upload server inbox (main jail) — move files out to commit them
 /uploads/
