@@ -6,6 +6,9 @@
 .claude-data.*
 .claude/settings.local.json
 
+# IDE
+.idea/
+
 # cloned projects (add subdirectory names here)
 therapy/
 homelab/
