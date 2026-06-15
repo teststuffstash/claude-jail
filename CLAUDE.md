@@ -10,6 +10,14 @@ You are running inside a Docker container with full permissions. All actions are
 - Workspace: `/workspace` — bind-mounted from the host's `~/Projects` directory (read-write)
 - Memory and session history: persisted at `/home/node/.claude`, bind-mounted to `.claude-data/` on the host
 
+## Homelab platform services (S3, DB, dashboards, …)
+
+Many projects here build on the self-hosted **homelab** Kubernetes cluster. To discover what services
+exist (and which are only planned), **read [`/workspace/homelab/SERVICES.md`](homelab/SERVICES.md) and
+grep it** — that catalog is the source of truth. **Do not `kubectl` around the cluster to discover
+services**, and do not assume a service exists until the catalog marks it `LIVE` (e.g. S3/Garage is
+LIVE; Postgres is PLANNED / not deployed). How to consume one is linked from the catalog.
+
 ## Behavior
 
 - Run commands without asking for permission first.
