@@ -23,3 +23,4 @@ snore-recorder/
 # python bytecode (e.g. from the upload tool)
 __pycache__/
 *.pyc
+openrouter-operator/

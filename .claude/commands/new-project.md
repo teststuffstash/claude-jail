@@ -23,7 +23,11 @@ scaffolded a README first), skip the init bits and just add what's missing.
 ```bash
 mkdir -p /workspace/<name>
 cd /workspace/<name>
-git rev-parse --git-dir >/dev/null 2>&1 || git init
+# IMPORTANT: /workspace is itself a git repo (claude-jail), so `git rev-parse --git-dir` walks UP
+# and falsely reports "already a repo" — then every add/commit/remote/push silently runs against the
+# parent jail repo (this happened once: a whole project got pushed to the wrong GitHub repo and the
+# jail repo's origin got clobbered). Check for a `.git` in THIS directory only:
+[ -d .git ] || git init
 ```
 
 ## Step 3 — create .gitignore
@@ -156,6 +160,35 @@ git branch -M master
 GIT_SSH_COMMAND="ssh -i ~/.claude/homelab-forgejo/id_ed25519 -o StrictHostKeyChecking=accept-new" \
   git push -u origin master
 ```
+
+## Step 6b — CI & platform requirements (discover, don't inline)
+
+The project **depends on** the homelab platform contract — don't copy its facts into this repo,
+**reference** them. The catalog is [`homelab/SERVICES.md`](../homelab/SERVICES.md) (grep it — it lists
+CI runners, S3, registries, Postgres, secrets, …). At *runtime* an in-cluster agent gets what it needs
+**injected by the conductor** (model key via ESO, the repo, endpoints) — it does **not** clone homelab.
+
+If the project has CI, scaffold a thin `.github/workflows/ci.yaml` that just calls `devbox run ci` on
+the self-hosted runner (SERVICES.md → "CI runner — ephemeral"):
+
+```yaml
+jobs:
+  ci:
+    runs-on: homelab-ephemeral
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install xz (missing from the ARC runner image)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xz-utils
+      - uses: cachix/install-nix-action@v31
+        with: { install_options: --no-daemon, extra_nix_config: "experimental-features = nix-command flakes" }
+      - uses: jetify-com/devbox-install-action@v0.13.0
+        with: { skip-nix-installation: "true" }
+      - run: devbox run ci
+```
+
+**One-time org prereq for a new repo** (see [`homelab/docs/github-setup.md`](../homelab/docs/github-setup.md)):
+the org App + Default runner group already cover repos, but a **public** repo also needs the runner
+group's **"Allow public repositories"** toggle — without it CI queues forever with no runner.
 
 ## Step 7 — add to jail .gitignore
 
