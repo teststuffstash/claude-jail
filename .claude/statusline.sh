@@ -58,11 +58,21 @@ else
   echo "$fivh" > "$fivh_cache" 2>/dev/null || true
 fi
 
-# Derive actual limit from API percentage; fall back to env override or 200k.
+# Derive actual limit from API percentage. rate_limits is only present once THIS session has
+# made an API request (the CLI learns it from its own traffic) — so a fresh/idle session gets
+# none. Cache the last derived limit (persistent ~/.claude survives container rebuilds) and
+# reuse it, marked "~", instead of inventing a wrong percentage against the 200k default.
+limit_cache="/home/node/.claude/five-hour-limit.cached"
+fivh_max_approx=""
 if [[ -n "$five_pct" && "$five_pct" != "null" && "$five_pct" != "0" && "$fivh" -gt 0 ]]; then
   fivh_max=$(awk -v t="$fivh" -v p="$five_pct" 'BEGIN { printf "%d", t * 100 / p }')
+  echo "$fivh_max" > "$limit_cache" 2>/dev/null || true
+elif [[ -s "$limit_cache" ]]; then
+  fivh_max=$(cat "$limit_cache")
+  fivh_max_approx="~"
 else
   fivh_max="${CLAUDE_5H_LIMIT:-200000}"
+  fivh_max_approx="?"
 fi
 
 fmt_left() {
@@ -116,7 +126,7 @@ printf '\033]2;%s\007' "$title"
 
 out=""
 [[ -n "$cwd_short" ]] && out="$cwd_short │ "
-out+="$model │ ctx $(fmt "$ctx")/$(fmt "$ctx_max") ($(pct "$ctx" "$ctx_max")%) │ 5h $(fmt "$fivh")/$(fmt "$fivh_max") ($(pct "$fivh" "$fivh_max")%)$fivh_suffix"
+out+="$model │ ctx $(fmt "$ctx")/$(fmt "$ctx_max") ($(pct "$ctx" "$ctx_max")%) │ 5h $(fmt "$fivh")/${fivh_max_approx}$(fmt "$fivh_max") ($(pct "$fivh" "$fivh_max")%)$fivh_suffix"
 
 if [[ -n "$seven_pct" && "$seven_pct" != "null" ]]; then
   when=$(fmt_when "$seven_reset")
