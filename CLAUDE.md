@@ -15,8 +15,10 @@ You are running inside a Docker container with full permissions. All actions are
 Many projects here build on the self-hosted **homelab** Kubernetes cluster. To discover what services
 exist (and which are only planned), **read [`/workspace/homelab/SERVICES.md`](homelab/SERVICES.md) and
 grep it** — that catalog is the source of truth. **Do not `kubectl` around the cluster to discover
-services**, and do not assume a service exists until the catalog marks it `LIVE` (e.g. S3/Garage is
-LIVE; Postgres is PLANNED / not deployed). How to consume one is linked from the catalog.
+services**, and do not assume a service exists until the catalog marks it `LIVE` (e.g. S3/Garage and
+Postgres/CloudNativePG are both LIVE). Statuses change — **recheck the catalog, never repeat a
+remembered status** (Postgres sat in this very sentence as "PLANNED" long after it went LIVE). How
+to consume one is linked from the catalog.
 
 ## Behavior
 
