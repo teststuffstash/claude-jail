@@ -46,8 +46,12 @@ ENV_FILE="$PROJECTS/.env.$STACK"
 STATE_DIR="$PROJECTS/.claude-data-$STACK"
 
 # Pre-create bind-mount targets so docker doesn't create them root-owned.
+# .claude.json must be VALID JSON — an empty file reads as "corrupted: Unexpected
+# EOF" and gets backed up + reset on every launch. Seed {} if missing/empty.
 mkdir -p "$STATE_DIR"
-touch "$PROJECTS/.claude-data-$STACK.json" "$PROJECTS/.claude-data-$STACK.zsh_history"
+CLAUDE_JSON="$PROJECTS/.claude-data-$STACK.json"
+[ -s "$CLAUDE_JSON" ] || echo '{}' > "$CLAUDE_JSON"
+touch "$PROJECTS/.claude-data-$STACK.zsh_history"
 
 if [ ! -f "$ENV_FILE" ]; then
   cat > "$ENV_FILE" <<'EOF'
@@ -68,23 +72,30 @@ EOF
   echo "→ created $ENV_FILE — fill in the tokens, then re-run. Continuing without git credentials." >&2
 fi
 
-# Kube token airlock: mint a short-lived SA token with the HOST kubeconfig.
-# Degrades gracefully (warns + continues) until the SA exists / cluster reachable.
+# Kube token airlock: mint a short-lived SA token with the HOST-side homelab
+# devbox — the SAME mechanism as `devbox run k9s` (devbox.json sets
+# KUBECONFIG=$PWD/tofu/kubeconfig; regenerate it with `devbox run kubeconfig`).
+# Degrades gracefully (warns + continues), but SHOWS the real kubectl error —
+# "SA not found" (not deployed/synced yet) reads very differently from
+# "connection refused" (cluster/kubeconfig problem).
 ORACLE_KUBE_TOKEN="" ORACLE_KUBE_SERVER="" ORACLE_KUBE_CA=""
 HOMELAB="$PROJECTS/homelab"
-if [ -f "$HOMELAB/tofu/kubeconfig" ]; then
-  kdev() { (cd "$HOMELAB" && devbox run -- kubectl --kubeconfig tofu/kubeconfig "$@"); }
+if [ -d "$HOMELAB" ]; then
+  kdev() { (cd "$HOMELAB" && devbox run -- kubectl "$@"); }
   # 72h: sessions are sometimes left open for days; still a bounded derivative.
-  if ORACLE_KUBE_TOKEN=$(kdev -n "$KUBE_NS" create token "$KUBE_SA" --duration=72h 2>/dev/null); then
+  kube_err=$(mktemp)
+  if ORACLE_KUBE_TOKEN=$(kdev -n "$KUBE_NS" create token "$KUBE_SA" --duration=72h 2>"$kube_err"); then
     ORACLE_KUBE_SERVER=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}')
     ORACLE_KUBE_CA=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
     echo "→ minted 72h kube token for $KUBE_SA@$KUBE_NS"
   else
     ORACLE_KUBE_TOKEN=""
-    echo "⚠ could not mint kube token ($KUBE_SA in ns $KUBE_NS — SA deployed? cluster up?); continuing without kubectl" >&2
+    echo "⚠ could not mint kube token for $KUBE_SA@$KUBE_NS; continuing without kubectl. kubectl said:" >&2
+    sed 's/^/    /' "$kube_err" >&2
   fi
+  rm -f "$kube_err"
 else
-  echo "⚠ $HOMELAB/tofu/kubeconfig not found; continuing without kubectl" >&2
+  echo "⚠ $HOMELAB not found; continuing without kubectl" >&2
 fi
 export ORACLE_KUBE_TOKEN ORACLE_KUBE_SERVER ORACLE_KUBE_CA
 
