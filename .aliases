@@ -19,5 +19,6 @@ alias snore-recorder='UPLOAD_DIR=/workspace/snore-recorder/uploads docker compos
 alias openrouter-operator='UPLOAD_DIR=/workspace/openrouter-operator/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8016:8000 claude zsh -c "cd /workspace/openrouter-operator && exec claude"'
 alias teststuff='UPLOAD_DIR=/workspace/teststuff/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8007:8000 claude zsh -c "cd /workspace/teststuff && exec claude"'
 # oracle STACK-JAIL (not the mono jail): scoped mounts + per-stack tokens + SA kubectl.
-# First run: `oracle --login` (maps 54545 for /login; not while `main` is running).
+# Shares the mono jail's login (.credentials.json mount) — no /login needed;
+# `oracle --login` exists only for re-auth edge cases (maps 54545, not while main runs).
 alias oracle='~/Projects/tools/stack-jail.sh oracle'

@@ -57,6 +57,11 @@ services:
       - ${HOME}/Projects/tools:/workspace/tools:ro
       - ${HOME}/Projects/.claude-data-oracle:/home/node/.claude
       - ${HOME}/Projects/.claude-data-oracle.json:/home/node/.claude.json
+      # Subscription OAuth shared with the mono jail — the proven login-once
+      # pattern (multiple jail sessions already share this file live). Only the
+      # credentials file crosses over; the rest of .claude-data/ (homelab-*
+      # secret dirs) stays out of stack jails.
+      - ${HOME}/Projects/.claude-data/.credentials.json:/home/node/.claude/.credentials.json
       # Shared jail git identity, read-only at a side path; stack-jail-init.sh
       # copies it to ~/.gitconfig and appends the per-repo credential config.
       - ${HOME}/Projects/.claude-data.gitconfig:/home/node/.gitconfig-base:ro

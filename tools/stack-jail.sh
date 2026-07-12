@@ -18,9 +18,10 @@
 # HARD RULE either way: no credential in any jail may reach beyond the teststuffstash
 # org (fine-grained PAT with that resource owner, or an App installation token).
 #
-# --login: also publish the OAuth callback port 54545 so `/login` works (first run
-# only; collides with the mono jail's `main` session if that is running). The token
-# persists in .claude-data-<stack>/ afterwards.
+# Login is shared with the mono jail (.credentials.json single-file mount — the
+# proven login-once pattern; multiple jail sessions already share it live).
+# --login: publish the OAuth callback port 54545 for re-auth edge cases only
+# (collides with the mono jail's `main` session if that is running).
 set -euo pipefail
 
 PROJECTS="${HOME}/Projects"
@@ -139,6 +140,13 @@ else
   echo "⚠ $HOMELAB not found; continuing without kubectl" >&2
 fi
 export ORACLE_KUBE_TOKEN ORACLE_KUBE_SERVER ORACLE_KUBE_CA
+
+# Shared-login mount source must EXIST as a file, or docker creates a root-owned
+# directory at the target and login breaks in every jail.
+if [ ! -f "$PROJECTS/.claude-data/.credentials.json" ]; then
+  echo "⚠ $PROJECTS/.claude-data/.credentials.json missing — log in via the mono jail (main) first" >&2
+  exit 1
+fi
 
 PORTS=(-p "$UPLOAD_PORT:8000")
 [ "$LOGIN" = 1 ] && PORTS+=(-p 54545:54545)
