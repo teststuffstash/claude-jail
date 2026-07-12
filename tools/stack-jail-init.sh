@@ -1,8 +1,11 @@
 # stack-jail-init — sourced (zsh/sh) inside a per-stack jail before exec'ing claude.
-# Companion to tools/stack-jail.sh (host side), which injects the env this consumes:
-#   ORACLE_PAT            stack fine-grained PAT (owner identity, stack repos only)
-#   ORACLE_HOMELAB_TOKEN  optional branch+PR-only token for homelab pushes
-#   ORACLE_KUBE_*         short-lived SA token + server + CA (the airlock derivative)
+# Companion to tools/stack-jail.sh (host side), which injects the generic STACK_* env
+# this consumes (normalized from .env.<stack> + the case block + the kube airlock):
+#   STACK_NAME           stack name (kubeconfig context, messages)
+#   STACK_PAT            stack fine-grained PAT (owner identity, stack repos only)
+#   STACK_REPOS          space-separated repos the PAT covers (credential routing)
+#   STACK_HOMELAB_TOKEN  optional branch+PR-only token for homelab pushes
+#   STACK_KUBE_*         short-lived SA token + server + CA + ns (the airlock derivative)
 # Everything here is per-session container state (credential store, kubeconfig,
 # homelab clone) — the container is ephemeral, nothing persists but ~/.claude.
 # Sourced, not executed: exports GH_TOKEN into the claude process. Always returns 0.
@@ -28,15 +31,16 @@ _sj_cred() { # <token> <org/repo> — store entries with and without .git suffix
   printf 'https://x-access-token:%s@github.com/%s\nhttps://x-access-token:%s@github.com/%s.git\n' \
     "$1" "$2" "$1" "$2" >> "$HOME/.git-credentials"
 }
-if [ -n "${ORACLE_PAT:-}" ]; then
-  _sj_cred "$ORACLE_PAT" teststuffstash/oracle-fleet
-  _sj_cred "$ORACLE_PAT" teststuffstash/oracle-iac
-  export GH_TOKEN="$ORACLE_PAT"
+if [ -n "${STACK_PAT:-}" ]; then
+  for _sj_repo in ${STACK_REPOS:-}; do
+    _sj_cred "$STACK_PAT" "teststuffstash/$_sj_repo"
+  done
+  export GH_TOKEN="$STACK_PAT"
 else
-  _sj_warn "ORACLE_PAT empty (fill ~/Projects/.env.oracle) — git push + gh will not work"
+  _sj_warn "STACK_PAT empty (fill ~/Projects/.env.${STACK_NAME:-<stack>}) — git push + gh will not work"
 fi
-if [ -n "${ORACLE_HOMELAB_TOKEN:-}" ]; then
-  _sj_cred "$ORACLE_HOMELAB_TOKEN" teststuffstash/homelab
+if [ -n "${STACK_HOMELAB_TOKEN:-}" ]; then
+  _sj_cred "$STACK_HOMELAB_TOKEN" teststuffstash/homelab
   # gh against homelab needs this token explicitly (GH_TOKEN is the stack PAT):
   #   GH_TOKEN=$(git credential fill <<< $'protocol=https\nhost=github.com\npath=teststuffstash/homelab' | sed -n 's/^password=//p') gh pr create -R teststuffstash/homelab ...
 fi
@@ -51,7 +55,7 @@ if [ ! -d /workspace/homelab ]; then
 fi
 
 # ── kubectl: namespace-admin SA via the airlock token ──────────────────────────
-if [ -n "${ORACLE_KUBE_TOKEN:-}" ] && [ -n "${ORACLE_KUBE_SERVER:-}" ]; then
+if [ -n "${STACK_KUBE_TOKEN:-}" ] && [ -n "${STACK_KUBE_SERVER:-}" ]; then
   mkdir -p "$HOME/.kube"
   cat > "$HOME/.kube/config" <<EOF
 apiVersion: v1
@@ -59,16 +63,16 @@ kind: Config
 clusters:
   - name: homelab
     cluster:
-      server: ${ORACLE_KUBE_SERVER}
-      certificate-authority-data: ${ORACLE_KUBE_CA}
+      server: ${STACK_KUBE_SERVER}
+      certificate-authority-data: ${STACK_KUBE_CA}
 users:
-  - name: oracle-workbench
+  - name: ${STACK_NAME:-stack}-workbench
     user:
-      token: ${ORACLE_KUBE_TOKEN}
+      token: ${STACK_KUBE_TOKEN}
 contexts:
-  - name: oracle
-    context: { cluster: homelab, user: oracle-workbench, namespace: oracle-fleet }
-current-context: oracle
+  - name: ${STACK_NAME:-stack}
+    context: { cluster: homelab, user: ${STACK_NAME:-stack}-workbench, namespace: ${STACK_KUBE_NS:-default} }
+current-context: ${STACK_NAME:-stack}
 EOF
   chmod 600 "$HOME/.kube/config"
   # kubectl itself comes from the homelab clone's devbox (shared /nix store):
@@ -77,6 +81,6 @@ else
   _sj_warn "no kube token injected — kubectl unavailable this session"
 fi
 
-unset ORACLE_PAT ORACLE_HOMELAB_TOKEN ORACLE_KUBE_TOKEN ORACLE_KUBE_SERVER ORACLE_KUBE_CA
+unset STACK_PAT STACK_HOMELAB_TOKEN STACK_KUBE_TOKEN STACK_KUBE_SERVER STACK_KUBE_CA
 unset -f _sj_warn _sj_cred 2>/dev/null
 true

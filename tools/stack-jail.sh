@@ -3,8 +3,8 @@
 #
 #   stack-jail.sh <stack> [--login]
 #
-# The first per-stack jail (oracle) supersedes launching everything through the mono
-# claude-jail. Middle-ground permission model (decided 2026-07-12):
+# Per-stack jails supersede launching everything through the mono claude-jail.
+# Middle-ground permission model (decided 2026-07-12):
 #   - git: a per-stack fine-grained PAT with the OWNER's identity (resource owner
 #     teststuffstash, ONLY the stack's repos, Contents+PRs+Issues+Workflows R/W) →
 #     direct push to master works (owner bypasses rulesets). Plus an optional
@@ -17,6 +17,11 @@
 #     never enters the jail, only the bounded (72h) derivative does.
 # HARD RULE either way: no credential in any jail may reach beyond the teststuffstash
 # org (fine-grained PAT with that resource owner, or an App installation token).
+#
+# ADDING A STACK = one case-block entry below + `.env.<stack>` (created on first
+# run) + the PAT mint. The compose service is generic (`stack`); everything
+# stack-specific travels via `docker compose run -v/-e`. Definition of done:
+# `devbox run stack-lint <stack>` in homelab.
 #
 # Login is shared with the mono jail (.credentials.json single-file mount — the
 # proven login-once pattern; multiple jail sessions already share it live).
@@ -31,12 +36,12 @@ LOGIN=0
 
 case "$STACK" in
   oracle)
-    SERVICE=oracle
     MAIN_DIR=/workspace/oracle-fleet
     UPLOAD_PORT=8017
-    KUBE_NS=oracle-fleet
+    KUBE_NS=oracle-fleet          # workbench SA namespace (= the stack's mainRepo ns)
     KUBE_SA=oracle-workbench
-    TRUST_DIRS="/workspace/oracle-fleet /workspace/oracle-iac /workspace/homelab /workspace/teststuff"
+    REPOS="oracle-fleet oracle-iac"                 # repos the stack PAT covers (credential routing)
+    MOUNTS="oracle-fleet oracle-iac teststuff:ro"   # ~/Projects/<dir> → /workspace/<dir>
     ;;
   *)
     echo "usage: stack-jail.sh <stack> [--login]   (known stacks: oracle)" >&2
@@ -46,12 +51,13 @@ esac
 
 ENV_FILE="$PROJECTS/.env.$STACK"
 STATE_DIR="$PROJECTS/.claude-data-$STACK"
+CLAUDE_JSON="$PROJECTS/.claude-data-$STACK.json"
+PREFIX=$(printf '%s' "$STACK" | tr 'a-z-' 'A-Z_')
 
 # Pre-create bind-mount targets so docker doesn't create them root-owned.
 # .claude.json must be VALID JSON — an empty file reads as "corrupted: Unexpected
 # EOF" and gets backed up + reset on every launch. Seed {} if missing/empty.
 mkdir -p "$STATE_DIR"
-CLAUDE_JSON="$PROJECTS/.claude-data-$STACK.json"
 [ -s "$CLAUDE_JSON" ] || echo '{}' > "$CLAUDE_JSON"
 touch "$PROJECTS/.claude-data-$STACK.zsh_history"
 
@@ -64,7 +70,7 @@ touch "$PROJECTS/.claude-data-$STACK.zsh_history"
 #     (the mono path /workspace/.claude/statusline.sh doesn't exist in a stack
 #     jail — only the stack dirs are mounted).
 #  2. .claude.json: additive merge — set onboarding-done + trust flags for the
-#     stack dirs only where missing; never overwrites state the jail wrote.
+#     stack's dirs only where missing; never overwrites state the jail wrote.
 if [ ! -f "$STATE_DIR/settings.json" ] && [ -f "$PROJECTS/.claude-data/settings.json" ]; then
   python3 - "$PROJECTS/.claude-data/settings.json" "$STATE_DIR/settings.json" <<'PYEOF'
 import json, sys
@@ -79,6 +85,8 @@ PYEOF
   fi
   echo "→ bootstrapped $STATE_DIR/settings.json from the mono jail"
 fi
+TRUST_DIRS="/workspace/homelab"
+for m in $MOUNTS; do TRUST_DIRS="$TRUST_DIRS /workspace/${m%%:*}"; done
 python3 - "$CLAUDE_JSON" "$PROJECTS/.claude-data.json" $TRUST_DIRS <<'PYEOF'
 import json, os, sys
 target, mono_path, dirs = sys.argv[1], sys.argv[2], sys.argv[3:]
@@ -96,23 +104,34 @@ json.dump(d, open(target, "w"), indent=2)
 PYEOF
 
 if [ ! -f "$ENV_FILE" ]; then
-  cat > "$ENV_FILE" <<'EOF'
-# oracle stack-jail credentials (gitignored; read by docker compose env_file).
-# ORACLE_PAT — fine-grained PAT, YOUR identity. Resource owner: teststuffstash.
-#   Repository access: ONLY oracle-fleet + oracle-iac.
+  cat > "$ENV_FILE" <<EOF
+# $STACK stack-jail credentials (gitignored; sourced by tools/stack-jail.sh).
+# ${PREFIX}_PAT — fine-grained PAT, YOUR identity. Resource owner: teststuffstash.
+#   Repository access: ONLY $REPOS.
 #   Permissions: Contents R/W, Pull requests R/W, Issues R/W, Workflows R/W.
 #   (Workflows is required to push changes under .github/workflows/.)
-ORACLE_PAT=
-# ORACLE_HOMELAB_TOKEN — optional; enables pushing agent/* branches + PRs to homelab
-# from inside the jail. Use a token that is branch+PR-only BY IDENTITY (minted from
-# the homelab-agents App: homelab/scripts/gh-app-runner-token.sh sibling flow), NOT
-# a PAT with your identity — your pushes bypass the rulesets everywhere.
-# Read access is not needed (homelab is public; the clone is tokenless).
-ORACLE_HOMELAB_TOKEN=
+${PREFIX}_PAT=
+# ${PREFIX}_HOMELAB_TOKEN — optional; enables pushing agent/* branches + PRs to
+# homelab from inside the jail. Use a token that is branch+PR-only BY IDENTITY
+# (minted from the homelab-agents App), NOT a PAT with your identity — your
+# pushes bypass the rulesets everywhere. Read access is not needed (homelab is
+# public; the clone is tokenless).
+${PREFIX}_HOMELAB_TOKEN=
 EOF
   chmod 600 "$ENV_FILE"
   echo "→ created $ENV_FILE — fill in the tokens, then re-run. Continuing without git credentials." >&2
 fi
+
+# Normalize the per-stack env names to the generic STACK_* contract that
+# tools/stack-jail-init.sh consumes inside the jail.
+set -a; . "$ENV_FILE"; set +a
+pat_var="${PREFIX}_PAT"; hl_var="${PREFIX}_HOMELAB_TOKEN"
+export STACK_NAME="$STACK"
+export STACK_PAT="${!pat_var:-}"
+export STACK_HOMELAB_TOKEN="${!hl_var:-}"
+export STACK_REPOS="$REPOS"
+export STACK_KUBE_NS="$KUBE_NS"
+export UPLOAD_DIR="$MAIN_DIR/uploads"
 
 # Kube token airlock: mint a short-lived SA token with the HOST-side homelab
 # devbox — the SAME mechanism as `devbox run k9s` (devbox.json sets
@@ -120,18 +139,18 @@ fi
 # Degrades gracefully (warns + continues), but SHOWS the real kubectl error —
 # "SA not found" (not deployed/synced yet) reads very differently from
 # "connection refused" (cluster/kubeconfig problem).
-ORACLE_KUBE_TOKEN="" ORACLE_KUBE_SERVER="" ORACLE_KUBE_CA=""
+STACK_KUBE_TOKEN="" STACK_KUBE_SERVER="" STACK_KUBE_CA=""
 HOMELAB="$PROJECTS/homelab"
 if [ -d "$HOMELAB" ]; then
   kdev() { (cd "$HOMELAB" && devbox run -- kubectl "$@"); }
   # 72h: sessions are sometimes left open for days; still a bounded derivative.
   kube_err=$(mktemp)
-  if ORACLE_KUBE_TOKEN=$(kdev -n "$KUBE_NS" create token "$KUBE_SA" --duration=72h 2>"$kube_err"); then
-    ORACLE_KUBE_SERVER=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}')
-    ORACLE_KUBE_CA=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+  if STACK_KUBE_TOKEN=$(kdev -n "$KUBE_NS" create token "$KUBE_SA" --duration=72h 2>"$kube_err"); then
+    STACK_KUBE_SERVER=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}')
+    STACK_KUBE_CA=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
     echo "→ minted 72h kube token for $KUBE_SA@$KUBE_NS"
   else
-    ORACLE_KUBE_TOKEN=""
+    STACK_KUBE_TOKEN=""
     echo "⚠ could not mint kube token for $KUBE_SA@$KUBE_NS; continuing without kubectl. kubectl said:" >&2
     sed 's/^/    /' "$kube_err" >&2
   fi
@@ -139,7 +158,7 @@ if [ -d "$HOMELAB" ]; then
 else
   echo "⚠ $HOMELAB not found; continuing without kubectl" >&2
 fi
-export ORACLE_KUBE_TOKEN ORACLE_KUBE_SERVER ORACLE_KUBE_CA
+export STACK_KUBE_TOKEN STACK_KUBE_SERVER STACK_KUBE_CA
 
 # Shared-login mount source must EXIST as a file, or docker creates a root-owned
 # directory at the target and login breaks in every jail.
@@ -148,11 +167,23 @@ if [ ! -f "$PROJECTS/.claude-data/.credentials.json" ]; then
   exit 1
 fi
 
+VOLS=(
+  -v "$STATE_DIR:/home/node/.claude"
+  -v "$CLAUDE_JSON:/home/node/.claude.json"
+  -v "$PROJECTS/.claude-data-$STACK.zsh_history:/home/node/.zsh_history"
+)
+for m in $MOUNTS; do
+  dir="${m%%:*}"; suffix=""
+  [ "$m" != "$dir" ] && suffix=":${m#*:}"
+  VOLS+=(-v "$PROJECTS/$dir:/workspace/$dir$suffix")
+done
+
 PORTS=(-p "$UPLOAD_PORT:8000")
 [ "$LOGIN" = 1 ] && PORTS+=(-p 54545:54545)
 
 exec docker compose -f "$PROJECTS/docker-compose.yml" run --rm \
-  "${PORTS[@]}" \
-  -e ORACLE_KUBE_TOKEN -e ORACLE_KUBE_SERVER -e ORACLE_KUBE_CA \
-  "$SERVICE" \
+  "${PORTS[@]}" "${VOLS[@]}" \
+  -e UPLOAD_DIR -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
+  -e STACK_KUBE_TOKEN -e STACK_KUBE_SERVER -e STACK_KUBE_CA -e STACK_KUBE_NS \
+  stack \
   zsh -c "source /workspace/tools/stack-jail-init.sh && cd $MAIN_DIR && exec claude"

@@ -28,35 +28,28 @@ services:
     env_file:
       - .env
 
-  # oracle stack-jail — the first per-stack jail (middle-ground permissions, see
-  # tools/stack-jail.sh header). Differences from `claude` on purpose:
-  #   - mounts ONLY the oracle stack dirs, not all of ~/Projects (homelab is
+  # Generic STACK-JAIL service (middle-ground permissions, see tools/stack-jail.sh
+  # header). One service for every per-stack jail — everything stack-specific
+  # (project mounts, state files, tokens, UPLOAD_DIR) is passed by the launcher
+  # via `docker compose run -v/-e`, so a new stack jail is a case-block entry in
+  # tools/stack-jail.sh, not a compose edit. Never `docker compose run stack`
+  # directly. Differences from `claude` on purpose:
+  #   - NO ~/Projects mount: only the stack dirs the launcher passes (homelab is
   #     shallow-cloned inside by tools/stack-jail-init.sh — the host checkout
   #     holds gitignored secrets: tofu state, kubeconfigs)
-  #   - its own .claude-data-oracle state (the mono jail's ~/.claude holds the
-  #     homelab-* secret dirs; they must not leak into a stack jail)
-  #   - env_file .env.oracle only: the stack PAT + homelab token, NOT the
-  #     mono jail's org-wide GH_TOKEN/FORGEJO_TOKEN
-  # Launch via tools/stack-jail.sh (the alias), not `docker compose run` directly —
-  # it pre-creates the state files and mints the per-session kube token.
-  oracle:
+  #   - per-stack .claude-data-<stack> state (the mono jail's ~/.claude holds
+  #     the homelab-* secret dirs; they must not leak into a stack jail)
+  #   - no .env: the launcher sources .env.<stack> and passes only its keys
+  stack:
     build:
       context: .
       args:
         HOST_UID: ${HOST_UID}
         HOST_GID: ${HOST_GID}
-    working_dir: /workspace/oracle-fleet
-    environment:
-      UPLOAD_DIR: ${UPLOAD_DIR:-/workspace/oracle-fleet/uploads}
+    working_dir: /workspace
     volumes:
-      - ${HOME}/Projects/oracle-fleet:/workspace/oracle-fleet
-      - ${HOME}/Projects/oracle-iac:/workspace/oracle-iac
-      # Business context (docs-only, no secrets in the working tree) — read-only.
-      - ${HOME}/Projects/teststuff:/workspace/teststuff:ro
       # tools/ read-only: the upload server + stack-jail-init.sh live here
       - ${HOME}/Projects/tools:/workspace/tools:ro
-      - ${HOME}/Projects/.claude-data-oracle:/home/node/.claude
-      - ${HOME}/Projects/.claude-data-oracle.json:/home/node/.claude.json
       # Subscription OAuth shared with the mono jail — the proven login-once
       # pattern (multiple jail sessions already share this file live). Only the
       # credentials file crosses over; the rest of .claude-data/ (homelab-*
@@ -68,5 +61,3 @@ services:
       - /nix:/nix
     stdin_open: true
     tty: true
-    env_file:
-      - .env.oracle
