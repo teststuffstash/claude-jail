@@ -35,6 +35,7 @@ case "$STACK" in
     UPLOAD_PORT=8017
     KUBE_NS=oracle-fleet
     KUBE_SA=oracle-workbench
+    TRUST_DIRS="/workspace/oracle-fleet /workspace/oracle-iac /workspace/homelab /workspace/teststuff"
     ;;
   *)
     echo "usage: stack-jail.sh <stack> [--login]   (known stacks: oracle)" >&2
@@ -52,6 +53,46 @@ mkdir -p "$STATE_DIR"
 CLAUDE_JSON="$PROJECTS/.claude-data-$STACK.json"
 [ -s "$CLAUDE_JSON" ] || echo '{}' > "$CLAUDE_JSON"
 touch "$PROJECTS/.claude-data-$STACK.zsh_history"
+
+# Bootstrap the stack jail's Claude config from the mono jail's solved state —
+# otherwise every new stack jail re-runs onboarding (theme/trust prompts) and
+# loses the bypass-permissions setup. Two pieces, both idempotent:
+#  1. settings.json (permissions allow-list, skipDangerousModePermissionPrompt,
+#     model, theme, statusline): copied ONCE if absent, so per-stack overrides
+#     stick. The statusline script is copied alongside and the command repointed
+#     (the mono path /workspace/.claude/statusline.sh doesn't exist in a stack
+#     jail — only the stack dirs are mounted).
+#  2. .claude.json: additive merge — set onboarding-done + trust flags for the
+#     stack dirs only where missing; never overwrites state the jail wrote.
+if [ ! -f "$STATE_DIR/settings.json" ] && [ -f "$PROJECTS/.claude-data/settings.json" ]; then
+  python3 - "$PROJECTS/.claude-data/settings.json" "$STATE_DIR/settings.json" <<'PYEOF'
+import json, sys
+s = json.load(open(sys.argv[1]))
+if "statusLine" in s:
+    s["statusLine"]["command"] = "/home/node/.claude/statusline.sh"
+json.dump(s, open(sys.argv[2], "w"), indent=2)
+PYEOF
+  if [ -f "$PROJECTS/.claude/statusline.sh" ]; then
+    cp "$PROJECTS/.claude/statusline.sh" "$STATE_DIR/statusline.sh"
+    chmod +x "$STATE_DIR/statusline.sh"
+  fi
+  echo "→ bootstrapped $STATE_DIR/settings.json from the mono jail"
+fi
+python3 - "$CLAUDE_JSON" "$PROJECTS/.claude-data.json" $TRUST_DIRS <<'PYEOF'
+import json, os, sys
+target, mono_path, dirs = sys.argv[1], sys.argv[2], sys.argv[3:]
+d = json.load(open(target))
+mono = json.load(open(mono_path)) if os.path.exists(mono_path) else {}
+for k in ("hasCompletedOnboarding", "lastOnboardingVersion", "theme"):
+    if k not in d and k in mono and mono[k] is not None:
+        d[k] = mono[k]
+projects = d.setdefault("projects", {})
+for p in dirs:
+    entry = projects.setdefault(p, {})
+    entry.setdefault("hasTrustDialogAccepted", True)
+    entry.setdefault("hasCompletedProjectOnboarding", True)
+json.dump(d, open(target, "w"), indent=2)
+PYEOF
 
 if [ ! -f "$ENV_FILE" ]; then
   cat > "$ENV_FILE" <<'EOF'
