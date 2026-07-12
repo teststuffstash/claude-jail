@@ -27,3 +27,41 @@ services:
     tty: true
     env_file:
       - .env
+
+  # oracle stack-jail — the first per-stack jail (middle-ground permissions, see
+  # tools/stack-jail.sh header). Differences from `claude` on purpose:
+  #   - mounts ONLY the oracle stack dirs, not all of ~/Projects (homelab is
+  #     shallow-cloned inside by tools/stack-jail-init.sh — the host checkout
+  #     holds gitignored secrets: tofu state, kubeconfigs)
+  #   - its own .claude-data-oracle state (the mono jail's ~/.claude holds the
+  #     homelab-* secret dirs; they must not leak into a stack jail)
+  #   - env_file .env.oracle only: the stack PAT + homelab token, NOT the
+  #     mono jail's org-wide GH_TOKEN/FORGEJO_TOKEN
+  # Launch via tools/stack-jail.sh (the alias), not `docker compose run` directly —
+  # it pre-creates the state files and mints the per-session kube token.
+  oracle:
+    build:
+      context: .
+      args:
+        HOST_UID: ${HOST_UID}
+        HOST_GID: ${HOST_GID}
+    working_dir: /workspace/oracle-fleet
+    environment:
+      UPLOAD_DIR: ${UPLOAD_DIR:-/workspace/oracle-fleet/uploads}
+    volumes:
+      - ${HOME}/Projects/oracle-fleet:/workspace/oracle-fleet
+      - ${HOME}/Projects/oracle-iac:/workspace/oracle-iac
+      # Business context (docs-only, no secrets in the working tree) — read-only.
+      - ${HOME}/Projects/teststuff:/workspace/teststuff:ro
+      # tools/ read-only: the upload server + stack-jail-init.sh live here
+      - ${HOME}/Projects/tools:/workspace/tools:ro
+      - ${HOME}/Projects/.claude-data-oracle:/home/node/.claude
+      - ${HOME}/Projects/.claude-data-oracle.json:/home/node/.claude.json
+      # Shared jail git identity, read-only at a side path; stack-jail-init.sh
+      # copies it to ~/.gitconfig and appends the per-repo credential config.
+      - ${HOME}/Projects/.claude-data.gitconfig:/home/node/.gitconfig-base:ro
+      - /nix:/nix
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env.oracle

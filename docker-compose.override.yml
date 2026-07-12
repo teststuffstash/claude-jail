@@ -8,3 +8,12 @@ services:
       - ${HOME}/.zshrc:/home/node/.zshrc:ro
       - ${HOME}/.oh-my-zsh:/home/node/.oh-my-zsh
       - ${HOME}/Projects/.claude-data.zsh_history:/home/node/.zsh_history
+  oracle:
+    environment:
+      TZ: Europe/Tallinn
+      TERM: xterm-256color
+      COLORTERM: truecolor
+    volumes:
+      - ${HOME}/.zshrc:/home/node/.zshrc:ro
+      - ${HOME}/.oh-my-zsh:/home/node/.oh-my-zsh
+      - ${HOME}/Projects/.claude-data-oracle.zsh_history:/home/node/.zsh_history

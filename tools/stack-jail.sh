@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# stack-jail — host-side launcher for a per-stack jail (the credential airlock).
+#
+#   stack-jail.sh <stack> [--login]
+#
+# The first per-stack jail (oracle) supersedes launching everything through the mono
+# claude-jail. Middle-ground permission model (decided 2026-07-12):
+#   - git: a per-stack fine-grained PAT with the OWNER's identity (resource owner
+#     teststuffstash, ONLY the stack's repos, Contents+PRs+Issues+Workflows R/W) →
+#     direct push to master works (owner bypasses rulesets). Plus an optional
+#     homelab token that is branch+PR-only BY IDENTITY (minted from the agents App —
+#     a single user PAT cannot be PR-only anywhere, the owner bypasses everything).
+#   - filesystem: only the stack dirs are mounted; homelab is shallow-cloned inside
+#     the jail (the host checkout holds gitignored secrets: tofu state, kubeconfigs).
+#   - kubectl: a namespace-admin ServiceAccount; THIS script mints its short-lived
+#     token with YOUR host kubeconfig and injects it — the privileged credential
+#     never enters the jail, only the bounded (72h) derivative does.
+# HARD RULE either way: no credential in any jail may reach beyond the teststuffstash
+# org (fine-grained PAT with that resource owner, or an App installation token).
+#
+# --login: also publish the OAuth callback port 54545 so `/login` works (first run
+# only; collides with the mono jail's `main` session if that is running). The token
+# persists in .claude-data-<stack>/ afterwards.
+set -euo pipefail
+
+PROJECTS="${HOME}/Projects"
+STACK="${1:-}"; shift || true
+LOGIN=0
+[ "${1:-}" = "--login" ] && LOGIN=1
+
+case "$STACK" in
+  oracle)
+    SERVICE=oracle
+    MAIN_DIR=/workspace/oracle-fleet
+    UPLOAD_PORT=8017
+    KUBE_NS=oracle-fleet
+    KUBE_SA=oracle-workbench
+    ;;
+  *)
+    echo "usage: stack-jail.sh <stack> [--login]   (known stacks: oracle)" >&2
+    exit 2
+    ;;
+esac
+
+ENV_FILE="$PROJECTS/.env.$STACK"
+STATE_DIR="$PROJECTS/.claude-data-$STACK"
+
+# Pre-create bind-mount targets so docker doesn't create them root-owned.
+mkdir -p "$STATE_DIR"
+touch "$PROJECTS/.claude-data-$STACK.json" "$PROJECTS/.claude-data-$STACK.zsh_history"
+
+if [ ! -f "$ENV_FILE" ]; then
+  cat > "$ENV_FILE" <<'EOF'
+# oracle stack-jail credentials (gitignored; read by docker compose env_file).
+# ORACLE_PAT — fine-grained PAT, YOUR identity. Resource owner: teststuffstash.
+#   Repository access: ONLY oracle-fleet + oracle-iac.
+#   Permissions: Contents R/W, Pull requests R/W, Issues R/W, Workflows R/W.
+#   (Workflows is required to push changes under .github/workflows/.)
+ORACLE_PAT=
+# ORACLE_HOMELAB_TOKEN — optional; enables pushing agent/* branches + PRs to homelab
+# from inside the jail. Use a token that is branch+PR-only BY IDENTITY (minted from
+# the homelab-agents App: homelab/scripts/gh-app-runner-token.sh sibling flow), NOT
+# a PAT with your identity — your pushes bypass the rulesets everywhere.
+# Read access is not needed (homelab is public; the clone is tokenless).
+ORACLE_HOMELAB_TOKEN=
+EOF
+  chmod 600 "$ENV_FILE"
+  echo "→ created $ENV_FILE — fill in the tokens, then re-run. Continuing without git credentials." >&2
+fi
+
+# Kube token airlock: mint a short-lived SA token with the HOST kubeconfig.
+# Degrades gracefully (warns + continues) until the SA exists / cluster reachable.
+ORACLE_KUBE_TOKEN="" ORACLE_KUBE_SERVER="" ORACLE_KUBE_CA=""
+HOMELAB="$PROJECTS/homelab"
+if [ -f "$HOMELAB/tofu/kubeconfig" ]; then
+  kdev() { (cd "$HOMELAB" && devbox run -- kubectl --kubeconfig tofu/kubeconfig "$@"); }
+  # 72h: sessions are sometimes left open for days; still a bounded derivative.
+  if ORACLE_KUBE_TOKEN=$(kdev -n "$KUBE_NS" create token "$KUBE_SA" --duration=72h 2>/dev/null); then
+    ORACLE_KUBE_SERVER=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}')
+    ORACLE_KUBE_CA=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+    echo "→ minted 72h kube token for $KUBE_SA@$KUBE_NS"
+  else
+    ORACLE_KUBE_TOKEN=""
+    echo "⚠ could not mint kube token ($KUBE_SA in ns $KUBE_NS — SA deployed? cluster up?); continuing without kubectl" >&2
+  fi
+else
+  echo "⚠ $HOMELAB/tofu/kubeconfig not found; continuing without kubectl" >&2
+fi
+export ORACLE_KUBE_TOKEN ORACLE_KUBE_SERVER ORACLE_KUBE_CA
+
+PORTS=(-p "$UPLOAD_PORT:8000")
+[ "$LOGIN" = 1 ] && PORTS+=(-p 54545:54545)
+
+exec docker compose -f "$PROJECTS/docker-compose.yml" run --rm \
+  "${PORTS[@]}" \
+  -e ORACLE_KUBE_TOKEN -e ORACLE_KUBE_SERVER -e ORACLE_KUBE_CA \
+  "$SERVICE" \
+  zsh -c "source /workspace/tools/stack-jail-init.sh && cd $MAIN_DIR && exec claude"

@@ -1,9 +1,11 @@
 # secrets
 .env
+.env.*
 
 # machine-specific claude state
 .claude-data/
 .claude-data.*
+.claude-data-*
 .claude/settings.local.json
 
 # IDE
@@ -16,6 +18,14 @@ car-fleet/
 idp/
 sleep-tracking/
 snore-recorder/
+oracle-fleet/
+oracle-iac/
+sleep-iac/
+agent-coordinator/
+agent-runtime/
+teststuff/
+bookmarks/
+nordic-testing-days-2024-talk/
 
 # upload server inbox (main jail) — move files out to commit them
 /uploads/

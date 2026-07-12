@@ -17,3 +17,7 @@ alias sleep-tracking='UPLOAD_DIR=/workspace/sleep-tracking/uploads docker compos
 alias sleep-tracking-or='UPLOAD_DIR=/workspace/sleep-tracking/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8015:8000 claude zsh -c "cd /workspace/sleep-tracking && exec ./claude-or"'
 alias snore-recorder='UPLOAD_DIR=/workspace/snore-recorder/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8006:8000 claude zsh -c "cd /workspace/snore-recorder && exec claude"'
 alias openrouter-operator='UPLOAD_DIR=/workspace/openrouter-operator/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8016:8000 claude zsh -c "cd /workspace/openrouter-operator && exec claude"'
+alias teststuff='UPLOAD_DIR=/workspace/teststuff/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8007:8000 claude zsh -c "cd /workspace/teststuff && exec claude"'
+# oracle STACK-JAIL (not the mono jail): scoped mounts + per-stack tokens + SA kubectl.
+# First run: `oracle --login` (maps 54545 for /login; not while `main` is running).
+alias oracle='~/Projects/tools/stack-jail.sh oracle'
