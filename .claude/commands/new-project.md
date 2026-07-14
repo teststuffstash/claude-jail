@@ -64,7 +64,8 @@ Local setup: dir + `[ -d .git ] || git init` guard (see Kind 1 step 1), `.gitign
 (`.idea/`, `.claude/settings.local.json`, `uploads/`, `.devbox/`), minimal CLAUDE.md + empty
 devbox.json (copy any recent project's), `.claude/settings.local.json` with
 `{"permissions":{"defaultMode":"bypassPermissions"}}`, remote
-`https://x-access-token:${GH_TOKEN}@github.com/teststuffstash/<name>.git`, push. Then the
+`https://github.com/teststuffstash/<name>.git` (plain URL — the mono-jail entrypoint's git
+credential store supplies the PAT; never embed `${GH_TOKEN}` in the remote, FU-002), push. Then the
 mono-jail alias (next free port) + jail `.gitignore` entry, as in Kind 1 steps 2/4 but with the
 `claude` compose service pattern — copy an existing `.aliases` line.
 

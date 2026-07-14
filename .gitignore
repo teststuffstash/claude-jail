@@ -26,6 +26,7 @@ agent-runtime/
 teststuff/
 bookmarks/
 nordic-testing-days-2024-talk/
+presentations/
 
 # upload server inbox (main jail) — move files out to commit them
 /uploads/
