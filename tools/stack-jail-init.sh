@@ -32,8 +32,15 @@ _sj_cred() { # <token> <org/repo> — store entries with and without .git suffix
     "$1" "$2" "$1" "$2" >> "$HOME/.git-credentials"
 }
 if [ -n "${STACK_PAT:-}" ]; then
-  for _sj_repo in ${STACK_REPOS:-}; do
-    _sj_cred "$STACK_PAT" "teststuffstash/$_sj_repo"
+  # Split STACK_REPOS by newline, not by unquoted word-splitting: this file is
+  # sourced under `zsh -c` (stack-jail.sh) and zsh does NOT word-split unquoted
+  # expansions (SH_WORD_SPLIT is off), so `for r in $STACK_REPOS` iterated ONCE
+  # over the whole string → a single malformed store entry (…/oracle-fleet
+  # oracle-iac allure-…) that useHttpPath matches to no real repo. Proven 2026-07-15
+  # in the oracle jail: oracle-iac had no credential (it lacks the incidental local
+  # gh helper that masked the bug for the other repos). tr|read is cross-shell.
+  echo "$STACK_REPOS" | tr ' ' '\n' | while IFS= read -r _sj_repo; do
+    [ -n "$_sj_repo" ] && _sj_cred "$STACK_PAT" "teststuffstash/$_sj_repo"
   done
   export GH_TOKEN="$STACK_PAT"
 else
