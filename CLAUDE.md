@@ -25,3 +25,12 @@ to consume one is linked from the catalog.
 - Run commands without asking for permission first.
 - Prefer fixing things directly over explaining how to fix them.
 - Be concise. Skip trailing summaries.
+- **Prior-art check before creating anything named** (a doc, script, tracker entry, ADR,
+  manifest): these projects are heavily documented — assume the concern already has an owner.
+  Grep the project's docs/trackers/memory by topic keywords and state what you found ("nothing
+  matches <keywords>") before writing. If a related artifact exists, extend it, never create a
+  parallel one.
+- **Resolve references before acting on them.** When the user names a thing ("the credential
+  helper", "that follow-up", "the leaked PAT"), it exists — grep for it and act on what you find,
+  not on a reconstruction. Questions like "is this already tracked somewhere?" are retrieval
+  requests (the user half-remembers, without the exact place/id), not decisions delegated to you.
