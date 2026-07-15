@@ -56,6 +56,10 @@ fi
 
 # ── kubectl: namespace-admin SA via the airlock token ──────────────────────────
 if [ -n "${STACK_KUBE_TOKEN:-}" ] && [ -n "${STACK_KUBE_SERVER:-}" ]; then
+  # Tokens/CA are single opaque strings; strip any whitespace that snuck in during
+  # transport (a line-wrapped token once produced invalid kubeconfig YAML here).
+  STACK_KUBE_TOKEN=$(printf '%s' "$STACK_KUBE_TOKEN" | tr -d '[:space:]')
+  STACK_KUBE_CA=$(printf '%s' "${STACK_KUBE_CA:-}" | tr -d '[:space:]')
   mkdir -p "$HOME/.kube"
   cat > "$HOME/.kube/config" <<EOF
 apiVersion: v1
@@ -75,8 +79,9 @@ contexts:
 current-context: ${STACK_NAME:-stack}
 EOF
   chmod 600 "$HOME/.kube/config"
-  # kubectl itself comes from the homelab clone's devbox (shared /nix store):
-  #   cd /workspace/homelab && devbox run -- kubectl get pods
+  # kubectl itself comes from a devbox (shared /nix store) — the stack's own
+  # devbox.json where it declares kubectl (oracle-fleet does), else the homelab
+  # clone's: cd /workspace/homelab && devbox run -- kubectl get pods
 else
   _sj_warn "no kube token injected — kubectl unavailable this session"
 fi

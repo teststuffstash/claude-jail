@@ -40,8 +40,8 @@ case "$STACK" in
     UPLOAD_PORT=8017
     KUBE_NS=oracle-fleet          # workbench SA namespace (= the stack's mainRepo ns)
     KUBE_SA=oracle-workbench
-    REPOS="oracle-fleet oracle-iac"                 # repos the stack PAT covers (credential routing)
-    MOUNTS="oracle-fleet oracle-iac teststuff:ro"   # ~/Projects/<dir> → /workspace/<dir>
+    REPOS="oracle-fleet oracle-iac allure-behavior-snippets"                 # repos the stack PAT covers (credential routing)
+    MOUNTS="oracle-fleet oracle-iac allure-behavior-snippets teststuff:ro"   # ~/Projects/<dir> → /workspace/<dir>
     ;;
   *)
     echo "usage: stack-jail.sh <stack> [--login]   (known stacks: oracle)" >&2
@@ -108,8 +108,11 @@ if [ ! -f "$ENV_FILE" ]; then
 # $STACK stack-jail credentials (gitignored; sourced by tools/stack-jail.sh).
 # ${PREFIX}_PAT — fine-grained PAT, YOUR identity. Resource owner: teststuffstash.
 #   Repository access: ONLY $REPOS.
-#   Permissions: Contents R/W, Pull requests R/W, Issues R/W, Workflows R/W.
-#   (Workflows is required to push changes under .github/workflows/.)
+#   Permissions: Contents R/W, Pull requests R/W, Issues R/W, Workflows R/W,
+#   Actions R/W, Commit statuses R. (Workflows is required to push under
+#   .github/workflows/; Actions for \`gh run watch\`/rerun. Known limit:
+#   fine-grained PATs have NO Checks permission — that API is Apps-only — so
+#   \`gh pr checks\` 403s; use \`gh run watch\` + PR mergeStateStatus instead.)
 ${PREFIX}_PAT=
 # ${PREFIX}_HOMELAB_TOKEN — optional; enables pushing agent/* branches + PRs to
 # homelab from inside the jail. Use a token that is branch+PR-only BY IDENTITY
@@ -146,8 +149,12 @@ if [ -d "$HOMELAB" ]; then
   # 72h: sessions are sometimes left open for days; still a bounded derivative.
   kube_err=$(mktemp)
   if STACK_KUBE_TOKEN=$(kdev -n "$KUBE_NS" create token "$KUBE_SA" --duration=72h 2>"$kube_err"); then
-    STACK_KUBE_SERVER=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}')
-    STACK_KUBE_CA=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}')
+    # tr: the captured output has arrived line-wrapped in practice (2026-07-13 oracle
+    # jail: token split across two lines → invalid kubeconfig YAML). Tokens/CA are
+    # single opaque strings — strip ALL whitespace, whatever injected it.
+    STACK_KUBE_TOKEN=$(printf '%s' "$STACK_KUBE_TOKEN" | tr -d '[:space:]')
+    STACK_KUBE_SERVER=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}' | tr -d '[:space:]')
+    STACK_KUBE_CA=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | tr -d '[:space:]')
     echo "→ minted 72h kube token for $KUBE_SA@$KUBE_NS"
   else
     STACK_KUBE_TOKEN=""
@@ -186,4 +193,4 @@ exec docker compose -f "$PROJECTS/docker-compose.yml" run --rm \
   -e UPLOAD_DIR -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
   -e STACK_KUBE_TOKEN -e STACK_KUBE_SERVER -e STACK_KUBE_CA -e STACK_KUBE_NS \
   stack \
-  zsh -c "source /workspace/tools/stack-jail-init.sh && cd $MAIN_DIR && exec claude"
+  zsh -c "source /workspace/tools/stack-jail-init.sh && cd $MAIN_DIR && exec claude --dangerously-skip-permissions"
