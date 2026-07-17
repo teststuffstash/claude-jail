@@ -27,11 +27,16 @@ teststuff/
 bookmarks/
 nordic-testing-days-2024-talk/
 presentations/
+allure-behavior-snippets/
+openrouter-operator/
 
 # upload server inbox (main jail) — move files out to commit them
 /uploads/
 
+# cross-jail handoff channel (runtime task files — see tools/handoff.md)
+.handoff/
+
 # python bytecode (e.g. from the upload tool)
 __pycache__/
 *.pyc
-openrouter-operator/
+

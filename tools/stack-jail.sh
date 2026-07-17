@@ -60,6 +60,9 @@ PREFIX=$(printf '%s' "$STACK" | tr 'a-z-' 'A-Z_')
 mkdir -p "$STATE_DIR"
 [ -s "$CLAUDE_JSON" ] || echo '{}' > "$CLAUDE_JSON"
 touch "$PROJECTS/.claude-data-$STACK.zsh_history"
+# Cross-jail handoff channel (tools/handoff.md): only THIS stack's subtree is
+# mounted, so a stack jail never sees another stack's traffic.
+mkdir -p "$PROJECTS/.handoff/$STACK"/{inbox,doing,done}
 
 # Bootstrap the stack jail's Claude config from the mono jail's solved state —
 # otherwise every new stack jail re-runs onboarding (theme/trust prompts) and
@@ -178,6 +181,7 @@ VOLS=(
   -v "$STATE_DIR:/home/node/.claude"
   -v "$CLAUDE_JSON:/home/node/.claude.json"
   -v "$PROJECTS/.claude-data-$STACK.zsh_history:/home/node/.zsh_history"
+  -v "$PROJECTS/.handoff/$STACK:/workspace/.handoff"
 )
 for m in $MOUNTS; do
   dir="${m%%:*}"; suffix=""

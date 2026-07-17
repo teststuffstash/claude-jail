@@ -143,6 +143,16 @@ To run several sessions at once without port clashes, the **container** always s
 
 The **main** jail runs from `~/Projects` for general/infra work and is the only session that maps the OAuth port, so it's the only one that can complete `/login` (the callback is fixed to `localhost:54545`). The project jails don't publish it at all. Log in once via `main`; the token persists in `.claude-data/` and works in every other session.
 
+## Cross-jail handoff
+
+During big platform rollouts a stack session (e.g. oracle) often needs quick homelab-side work
+from the mono session without GitHub-issue latency or copy-pasting between terminals. A shared
+file-drop channel covers this: the stack jail writes task files to `/workspace/.handoff/inbox/`
+(host `~/Projects/.handoff/<stack>/`, mounted per stack by `tools/stack-jail.sh`), and the mono
+session processes them with `/handoff` — typically looped, `/loop /handoff`. Results come back in
+`done/`. Protocol, file format, and boundaries: [`tools/handoff.md`](tools/handoff.md). It's a
+speed channel for attended sessions, not a tracker — durable outcomes still land in issues/docs.
+
 ## Re-running
 
 ```bash
