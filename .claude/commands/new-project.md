@@ -33,11 +33,13 @@ Then the jail-local half (this repo's ownership):
    `[ -d .git ] || git init` — ⚠ never `git rev-parse --git-dir`: /workspace is itself a repo, the
    check walks UP and git ops silently hit the jail repo (a project got pushed to the wrong remote
    once).
-2. **Stack jail**: add a `<name>)` case entry in [`tools/stack-jail.sh`](../../tools/stack-jail.sh)
-   (copy the `oracle)` block: MAIN_DIR, UPLOAD_PORT = next free `80NN` across .aliases + case
-   entries, KUBE_NS/SA, REPOS, MOUNTS) and an alias line in [`.aliases`](../../.aliases)
-   (`alias <name>='~/Projects/tools/stack-jail.sh <name>'`). First launch creates `.env.<name>`
-   with the PAT instructions in it — the mint is the user's step.
+2. **Stack jail**: REPOS/MOUNTS/NS derive from homelab `agents/stacks.json` automatically
+   (since 2026-08-03) — add ONLY the jail-owned overlay in
+   [`tools/stack-jail.sh`](../../tools/stack-jail.sh): `UPLOAD_PORT` (next free `80NN`),
+   `PRIMARY` (the cwd repo), any PRIVATE extra mounts (`teststuff:ro`-style — these must never
+   appear in public homelab); plus an alias line in [`.aliases`](../../.aliases). First launch
+   creates `.env.<name>` with the PAT instructions in it — the mint is the user's step.
+   ⚠ circles/sleep/platform overlays are pre-seeded.
 3. **Main-repo content**: CLAUDE.md, `.agents/{fix.yaml,review.md}`, devbox `ci` + `scan-secrets`,
    merge-path caller workflows — copy the shapes from **oracle-fleet** (the reference stack) and
    adapt; a `stack-template` repo is the planned collapse of this step.

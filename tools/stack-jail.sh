@@ -18,8 +18,11 @@
 # HARD RULE either way: no credential in any jail may reach beyond the teststuffstash
 # org (fine-grained PAT with that resource owner, or an App installation token).
 #
-# ADDING A STACK = one case-block entry below + `.env.<stack>` (created on first
-# run) + the PAT mint. The compose service is generic (`stack`); everything
+# ADDING A STACK (since 2026-08-03): REPOS/MOUNTS/KUBE_NS/SA/MAIN_DIR derive from
+# homelab's agents/stacks.json (the claims mirror) — the case block below carries ONLY the
+# jail-owned overlay: UPLOAD_PORT (host allocation) + private extra mounts (e.g. teststuff:ro),
+# which must never appear in the public homelab repo. So: one overlay entry + `.env.<stack>`
+# (created on first run) + the PAT mint. The compose service is generic (`stack`); everything
 # stack-specific travels via `docker compose run -v/-e`. Definition of done:
 # `devbox run stack-lint <stack>` in homelab.
 #
@@ -34,20 +37,44 @@ STACK="${1:-}"; shift || true
 LOGIN=0
 [ "${1:-}" = "--login" ] && LOGIN=1
 
+# ── Derived half: stacks.json is the authority for what a stack IS ──────────────────────────
+STACKS_JSON="$PROJECTS/homelab/agents/stacks.json"
+[ -f "$STACKS_JSON" ] || { echo "FATAL: $STACKS_JSON missing (homelab checkout is the stack authority)" >&2; exit 2; }
+derived="$(python3 - "$STACK" "$STACKS_JSON" <<'PY'
+import json, sys
+name, path = sys.argv[1], sys.argv[2]
+rows = [s for s in json.load(open(path))["stacks"] if s["name"] == name]
+if not rows:
+    known = " ".join(s["name"] for s in json.load(open(path))["stacks"])
+    sys.exit(f"unknown stack {name!r} (stacks.json knows: {known})")
+s = rows[0]
+print(" ".join(s["repos"]))
+PY
+)" || { echo "$derived" >&2; exit 2; }
+REPOS="$derived"
+MOUNTS="$REPOS"
+
+# ── Jail-owned overlay: port allocation, the PRIMARY (cwd) repo, PRIVATE mounts — the facts
+# that are jail ergonomics or must never appear in the public homelab repo ──────────────────
 case "$STACK" in
   oracle)
-    MAIN_DIR=/workspace/oracle-fleet
     UPLOAD_PORT=8017
-    KUBE_NS=oracle-fleet          # workbench SA namespace (= the stack's mainRepo ns)
-    KUBE_SA=oracle-workbench
-    REPOS="oracle-fleet oracle-iac allure-behavior-snippets"                 # repos the stack PAT covers (credential routing)
-    MOUNTS="oracle-fleet oracle-iac allure-behavior-snippets teststuff:ro"   # ~/Projects/<dir> → /workspace/<dir>
+    PRIMARY=oracle-fleet
+    MOUNTS="$MOUNTS teststuff:ro"   # the private strategy repo rides along read-only
+    ;;
+  sleep)     UPLOAD_PORT=8018; PRIMARY=sleep-tracking ;;
+  platform)  UPLOAD_PORT=8019; PRIMARY=openrouter-operator ;;
+  circles)   UPLOAD_PORT=8020; PRIMARY=circles
+    MOUNTS="$MOUNTS therapy:ro"     # the data repo, read-only reference (loop never sees it — jail only)
     ;;
   *)
-    echo "usage: stack-jail.sh <stack> [--login]   (known stacks: oracle)" >&2
+    echo "stack '$STACK' has no jail overlay yet — add a UPLOAD_PORT/PRIMARY (+ private mounts) case entry" >&2
     exit 2
     ;;
 esac
+MAIN_DIR="/workspace/$PRIMARY"
+KUBE_NS="$PRIMARY"                  # workbench SA namespace (= the stack's primary-repo ns)
+KUBE_SA="$STACK-workbench" 
 
 ENV_FILE="$PROJECTS/.env.$STACK"
 STATE_DIR="$PROJECTS/.claude-data-$STACK"
