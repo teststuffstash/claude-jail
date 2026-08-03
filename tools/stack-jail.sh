@@ -65,7 +65,7 @@ case "$STACK" in
   sleep)     UPLOAD_PORT=8018; PRIMARY=sleep-tracking ;;
   platform)  UPLOAD_PORT=8019; PRIMARY=openrouter-operator ;;
   circles)   UPLOAD_PORT=8020; PRIMARY=circles
-    MOUNTS="$MOUNTS therapy:ro"     # the data repo, read-only reference (loop never sees it — jail only)
+    MOUNTS="$MOUNTS life:ro"        # the data repo (renamed from therapy 2026-08-03), read-only — jail only
     ;;
   *)
     echo "stack '$STACK' has no jail overlay yet — add a UPLOAD_PORT/PRIMARY (+ private mounts) case entry" >&2

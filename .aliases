@@ -8,7 +8,7 @@
 alias main='UPLOAD_DIR=/workspace/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8000:8000 -p 54545:54545 claude'
 alias car-fleet='UPLOAD_DIR=/workspace/car-fleet/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8001:8000 claude zsh -c "cd /workspace/car-fleet && exec claude"'
 alias homelab='UPLOAD_DIR=/workspace/homelab/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8002:8000 claude zsh -c "cd /workspace/homelab && exec claude"'
-alias therapy='UPLOAD_DIR=/workspace/therapy/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8003:8000 claude zsh -c "cd /workspace/therapy && exec claude"'
+alias life='UPLOAD_DIR=/workspace/life/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8003:8000 claude zsh -c "cd /workspace/life && exec claude"'
 alias idp='UPLOAD_DIR=/workspace/idp/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8004:8000 claude zsh -c "cd /workspace/idp && exec claude"'
 alias sleep-tracking='UPLOAD_DIR=/workspace/sleep-tracking/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8005:8000 claude zsh -c "cd /workspace/sleep-tracking && exec claude"'
 # Same project, routed through OpenRouter instead of Anthropic. Reuses the

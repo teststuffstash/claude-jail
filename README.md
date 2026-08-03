@@ -71,7 +71,7 @@ Use the `main` alias from `.aliases` (it publishes the upload + OAuth ports):
 main   # = docker compose run --rm -p 8000:8000 -p 54545:54545 claude
 ```
 
-For project sessions use the other `.aliases` shortcuts (`car-fleet`, `homelab`, `therapy`) — see [Upload server & ports](#upload-server--ports). Compose itself declares no `ports:`; each alias publishes its own with `-p`.
+For project sessions use the other `.aliases` shortcuts (`car-fleet`, `homelab`, `life`) — see [Upload server & ports](#upload-server--ports). Compose itself declares no `ports:`; each alias publishes its own with `-p`.
 
 ### 3. Log in
 
@@ -139,7 +139,7 @@ To run several sessions at once without port clashes, the **container** always s
 | `main` (`~/Projects`) | `localhost:8000` | `54545` ← log in here |
 | car-fleet | `localhost:8001` | — |
 | homelab | `localhost:8002` | — |
-| therapy | `localhost:8003` | — |
+| life | `localhost:8003` | — |
 
 The **main** jail runs from `~/Projects` for general/infra work and is the only session that maps the OAuth port, so it's the only one that can complete `/login` (the callback is fixed to `localhost:54545`). The project jails don't publish it at all. Log in once via `main`; the token persists in `.claude-data/` and works in every other session.
 
@@ -157,7 +157,7 @@ speed channel for attended sessions, not a tracker — durable outcomes still la
 
 ```bash
 main        # general/infra jail (also where you /login)
-car-fleet   # or homelab / therapy
+car-fleet   # or homelab / life
 ```
 
 No rebuild needed unless you update the `Dockerfile`. Re-run `setup-env.sh` if your zsh dotfiles change.

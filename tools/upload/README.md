@@ -11,7 +11,7 @@ Just open the host port for your session and paste (Ctrl/Cmd+V), drop, or click:
 - main (`~/Projects`) → <http://localhost:8000>
 - car-fleet → <http://localhost:8001>
 - homelab → <http://localhost:8002>
-- therapy → <http://localhost:8003>
+- life → <http://localhost:8003>
 
 To run it manually against a different folder, note the auto-started instance already holds `8000` — give the manual one another port (only `8000` is forwarded to the host, so reach others via `docker compose port` or by adding them to `ports:`):
 
