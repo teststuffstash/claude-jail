@@ -175,7 +175,15 @@ export UPLOAD_DIR="$MAIN_DIR/uploads"
 STACK_KUBE_TOKEN="" STACK_KUBE_SERVER="" STACK_KUBE_CA=""
 HOMELAB="$PROJECTS/homelab"
 if [ -d "$HOMELAB" ]; then
-  kdev() { (cd "$HOMELAB" && devbox run -- kubectl "$@"); }
+  # `devbox run` writes its own chatter to STDOUT, so a bare $(devbox run -- ...) capture can
+  # swallow it into the value. It bit us on 2026-08-05: devbox's python plugin printed "Directory
+  # exists but is not a valid virtual environment. Creating a new one..." (the venv is shared
+  # between the host and the jails, and its bin/python symlink is an ABSOLUTE path into whichever
+  # project root created it — fixed in homelab devbox.json by moving VENV_DIR under $HOME), the
+  # line landed in front of the JWT, and the whitespace strip below then WELDED it into one
+  # token-shaped string. -q silences devbox; `tail -1` keeps only the payload line whatever else
+  # a future plugin decides to print.
+  kdev() { (cd "$HOMELAB" && devbox run -q -- kubectl "$@" | tail -1); }
   # 72h: sessions are sometimes left open for days; still a bounded derivative.
   kube_err=$(mktemp)
   if STACK_KUBE_TOKEN=$(kdev -n "$KUBE_NS" create token "$KUBE_SA" --duration=72h 2>"$kube_err"); then
@@ -185,7 +193,17 @@ if [ -d "$HOMELAB" ]; then
     STACK_KUBE_TOKEN=$(printf '%s' "$STACK_KUBE_TOKEN" | tr -d '[:space:]')
     STACK_KUBE_SERVER=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.server}' | tr -d '[:space:]')
     STACK_KUBE_CA=$(kdev config view --raw --minify -o jsonpath='{.clusters[0].cluster.certificate-authority-data}' | tr -d '[:space:]')
-    echo "→ minted 72h kube token for $KUBE_SA@$KUBE_NS"
+    # SHAPE GATE, not a formality: a contaminated token still LOOKS like a string and produces a
+    # kubeconfig that fails later with a bare 401 — which reads as "expired", sending you after
+    # the wrong thing (2026-08-05). A k8s SA token is a JWT: three dot-separated base64url parts.
+    if ! printf '%s' "$STACK_KUBE_TOKEN" | grep -qE '^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'; then
+      echo "⚠ minted token is NOT a JWT — something wrote to stdout during the mint." >&2
+      echo "    got: $(printf '%s' "$STACK_KUBE_TOKEN" | cut -c1-60)..." >&2
+      echo "    continuing WITHOUT kubectl rather than shipping a kubeconfig that 401s." >&2
+      STACK_KUBE_TOKEN=""
+    else
+      echo "→ minted 72h kube token for $KUBE_SA@$KUBE_NS"
+    fi
   else
     STACK_KUBE_TOKEN=""
     echo "⚠ could not mint kube token for $KUBE_SA@$KUBE_NS; continuing without kubectl. kubectl said:" >&2
