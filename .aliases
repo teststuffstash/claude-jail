@@ -30,4 +30,4 @@ alias circles='~/Projects/tools/stack-jail.sh circles'
 # local model-splitting shim; the MAIN model — fable — stays on the Anthropic subscription).
 # Slot map: homelab/.opencode-go.env; key: wallet `opencode-go-api-key`. Upload port 8012
 # so it can run alongside the native homelab session (8002).
-alias homelab-go='UPLOAD_DIR=/workspace/homelab/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8012:8000 claude zsh -c "exec bash scripts/claude-go.sh"'
+alias homelab-go='UPLOAD_DIR=/workspace/homelab/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8012:8000 claude zsh -c "cd /workspace/homelab && exec bash scripts/claude-go.sh"'
