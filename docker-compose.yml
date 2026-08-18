@@ -10,9 +10,24 @@ services:
       # Folder the auto-started upload server drops files into (a gitignored
       # uploads/ inbox, set per project in .aliases). Server always on port 8000.
       UPLOAD_DIR: ${UPLOAD_DIR:-/workspace/uploads}
+      # Per-jail identity on the OTLP telemetry (homelab#566): the collector already
+      # promotes resource attrs to metric labels, so jail_name lands in Prometheus and
+      # `sum by (jail_name, session_id)` answers "which jail burned what". JAIL_NAME is
+      # set by each alias in .aliases (default main). This is the SINGLE writer of
+      # OTEL_RESOURCE_ATTRIBUTES — the old copy in .claude-data/settings.json was
+      # removed 2026-08-18 (a shared-file value cannot differ per container, and env
+      # precedence between the two sources is ambiguity nobody needs).
+      OTEL_RESOURCE_ATTRIBUTES: service.name=claude-code,role=jail,stack=jail,jail.name=${JAIL_NAME:-main}
     volumes:
       - ${HOME}/Projects:/workspace
       - ${HOME}/Projects/.claude-data:/home/node/.claude
+      # Overlay the credentials file as a SINGLE-FILE mount on top of the dir
+      # mount, matching the stack service. On a file mountpoint the CLI's atomic
+      # rename fails (EBUSY) and it falls back to an in-place copy, so the host
+      # inode never changes. Without this, a mono-jail token refresh renames a
+      # new inode into .claude-data/ and every stack jail (pinned to the old
+      # inode by its file mount) drifts stale → "Login expired" within ~8h.
+      - ${HOME}/Projects/.claude-data/.credentials.json:/home/node/.claude/.credentials.json
       - ${HOME}/Projects/.claude-data.json:/home/node/.claude.json
       # Jail-only git identity. Host ~/.gitconfig is deliberately NOT mounted so
       # the jail can use its own author name/email. Edit .claude-data.gitconfig.
@@ -47,6 +62,10 @@ services:
         HOST_UID: ${HOST_UID}
         HOST_GID: ${HOST_GID}
     working_dir: /workspace
+    environment:
+      # Same per-jail OTLP identity as the claude service (homelab#566); stack-jail.sh
+      # sets JAIL_NAME="<stack>-stack" and passes it through.
+      OTEL_RESOURCE_ATTRIBUTES: service.name=claude-code,role=jail,stack=jail,jail.name=${JAIL_NAME:-stack}
     volumes:
       # tools/ read-only: the upload server + stack-jail-init.sh live here
       - ${HOME}/Projects/tools:/workspace/tools:ro

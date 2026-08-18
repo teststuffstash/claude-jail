@@ -160,6 +160,7 @@ fi
 set -a; . "$ENV_FILE"; set +a
 pat_var="${PREFIX}_PAT"; hl_var="${PREFIX}_HOMELAB_TOKEN"
 export STACK_NAME="$STACK"
+export JAIL_NAME="${STACK}-stack"   # per-jail OTLP identity (homelab#566) — compose maps it into OTEL_RESOURCE_ATTRIBUTES
 export STACK_PAT="${!pat_var:-}"
 export STACK_HOMELAB_TOKEN="${!hl_var:-}"
 export STACK_REPOS="$REPOS"
@@ -239,7 +240,7 @@ PORTS=(-p "$UPLOAD_PORT:8000")
 
 exec docker compose -f "$PROJECTS/docker-compose.yml" run --rm \
   "${PORTS[@]}" "${VOLS[@]}" \
-  -e UPLOAD_DIR -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
+  -e UPLOAD_DIR -e JAIL_NAME -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
   -e STACK_KUBE_TOKEN -e STACK_KUBE_SERVER -e STACK_KUBE_CA -e STACK_KUBE_NS \
   stack \
   zsh -c "source /workspace/tools/stack-jail-init.sh && cd $MAIN_DIR && exec claude --dangerously-skip-permissions"
