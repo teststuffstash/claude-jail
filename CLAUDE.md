@@ -1,36 +1,26 @@
-# Claude Code — Docker Jail
+# claude-jail — Docker jails for Claude Code sessions
 
-You are running inside a Docker container with full permissions. All actions are pre-approved — do not ask for confirmation before running commands, editing files, or installing packages.
+Repo facts only. **Session ground rules do not live here** — they live in
+[`tools/jail-card.md`](tools/jail-card.md), composed into `CLAUDE.local.md` at container
+start (claude-jail#1, homelab FU-117): the mono jail's `tools/jail-entrypoint.sh` writes
+the card to `/workspace/CLAUDE.local.md` and homelab's `agents/jail-seat-card.md` to
+`/workspace/homelab/CLAUDE.local.md` (seat sessions only); a stack jail's
+`tools/stack-jail-init.sh` prepends its rendered per-stack env card instead and gets no
+seat card by design.
 
-## Environment
+## What this repo is
 
-- Container base: `node:22-bookworm` (Debian, running as `node` user remapped to host UID/GID)
-- The `node` user has **passwordless sudo** — install packages directly with `sudo apt-get install ...` (installs are ephemeral; add to the `Dockerfile` to persist them)
-- **Project tooling is Devbox/Nix, not apt.** For per-project CLI tools (tofu, kubectl, talosctl, helm, …) prefer a committed `devbox.json` + `devbox shell` over ephemeral `sudo apt`/`curl` installs. The `/nix` store is bind-mounted from the host, so the same `devbox.json` works in the jail and on the host (and persists across rebuilds). `devbox.lock` is committed for deterministic versions.
-- Workspace: `/workspace` — bind-mounted from the host's `~/Projects` directory (read-write)
-- Memory and session history: persisted at `/home/node/.claude`, bind-mounted to `.claude-data/` on the host
-
-## Homelab platform services (S3, DB, dashboards, …)
-
-Many projects here build on the self-hosted **homelab** Kubernetes cluster. To discover what services
-exist (and which are only planned), **read [`/workspace/homelab/SERVICES.md`](homelab/SERVICES.md) and
-grep it** — that catalog is the source of truth. **Do not `kubectl` around the cluster to discover
-services**, and do not assume a service exists until the catalog marks it `LIVE` (e.g. S3/Garage and
-Postgres/CloudNativePG are both LIVE). Statuses change — **recheck the catalog, never repeat a
-remembered status** (Postgres sat in this very sentence as "PLANNED" long after it went LIVE). How
-to consume one is linked from the catalog.
-
-## Behavior
-
-- Run commands without asking for permission first.
-- Prefer fixing things directly over explaining how to fix them.
-- Be concise. Skip trailing summaries.
-- **Prior-art check before creating anything named** (a doc, script, tracker entry, ADR,
-  manifest): these projects are heavily documented — assume the concern already has an owner.
-  Grep the project's docs/trackers/memory by topic keywords and state what you found ("nothing
-  matches <keywords>") before writing. If a related artifact exists, extend it, never create a
-  parallel one.
-- **Resolve references before acting on them.** When the user names a thing ("the credential
-  helper", "that follow-up", "the leaked PAT"), it exists — grep for it and act on what you find,
-  not on a reconstruction. Questions like "is this already tracked somewhere?" are retrieval
-  requests (the user half-remembers, without the exact place/id), not decisions delegated to you.
+- `Dockerfile` + `docker-compose.yml`: one image, two services — `claude` (the **mono
+  jail**: all of the host's `~/Projects` mounted at `/workspace`) and `stack` (the
+  **per-stack jails**: scoped mounts, per-stack tokens, SA-scoped kubectl; launcher
+  `tools/stack-jail.sh`, in-container init `tools/stack-jail-init.sh`).
+- `.aliases`: host-side launch shortcuts, one per session type. Each publishes its own
+  upload port; only `main` maps the OAuth callback port 54545, so log in there once —
+  every other session shares the token via the `.credentials.json` single-file mount.
+- `tools/`: the entrypoint, the stack launcher/init pair, the upload server, the
+  cross-jail handoff protocol (`tools/handoff.md`), and the jail card.
+- This directory doubles as the host's `~/Projects`: project repos are cloned
+  side-by-side and gitignored here (see `.gitignore`'s cloned-projects block).
+- Credential boundary (HARD RULE): no credential in any jail may reach beyond the
+  `teststuffstash` org — fine-grained PATs with that resource owner, or App installation
+  tokens.

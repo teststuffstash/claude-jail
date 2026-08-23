@@ -32,6 +32,10 @@ openrouter-operator/
 circles/
 circles-iac/
 
+# composed session card (written by tools/jail-entrypoint.sh at container start;
+# the homelab checkout gitignores its own copy) — claude-jail#1
+/CLAUDE.local.md
+
 # upload server inbox (main jail) — move files out to commit them
 /uploads/
 
