@@ -29,6 +29,8 @@ nordic-testing-days-2024-talk/
 presentations/
 allure-behavior-snippets/
 openrouter-operator/
+circles/
+circles-iac/
 
 # upload server inbox (main jail) — move files out to commit them
 /uploads/
