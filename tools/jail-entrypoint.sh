@@ -35,6 +35,14 @@ if [ -z "${STACK_NAME:-}" ]; then
   elif [ -d /workspace/homelab ]; then
     echo "jail-entrypoint: homelab agents/jail-seat-card.md missing (homelab PR#773 unmerged or checkout stale?) — homelab seat sessions run WITHOUT the seat card" >&2
   fi
+  # Direct-master lint tripwire (operator direction 2026-08-30, homelab seat-card §How
+  # changes land): the jail's OrgAdmin master pushes bypass CI, so homelab's committed
+  # githooks/pre-push is the lane's only lint gate — wire it on every container start so a
+  # rebuilt container (fresh .git/config never happens — .git rides the host bind-mount —
+  # but a fresh CLONE would) cannot silently lose the hook.
+  if [ -d /workspace/homelab/githooks ]; then
+    git -C /workspace/homelab config core.hooksPath githooks || true
+  fi
 fi
 
 # Git credential store (FU-002): keep the GitHub PAT out of remote URLs. The mono
