@@ -31,3 +31,6 @@ alias circles='~/Projects/tools/stack-jail.sh circles'
 # Slot map: homelab/.opencode-go.env; key: wallet `opencode-go-api-key`. Upload port 8012
 # so it can run alongside the native homelab session (8002).
 alias homelab-go='JAIL_NAME=homelab-go UPLOAD_DIR=/workspace/homelab/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8012:8000 claude zsh -c "cd /workspace/homelab && exec bash scripts/claude-go.sh"'
+# Native Codex with persistent homelab state and its own upload port.
+# First login: homelab-codex --login; resume: homelab-codex -- codex resume --last
+alias homelab-codex='~/Projects/tools/codex-jail.sh --mono --homelab-wallet --env-file ~/Projects/.env --project ~/Projects/homelab --name homelab-codex --port 8022'

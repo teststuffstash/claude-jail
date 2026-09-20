@@ -1,0 +1,9 @@
+# Only the image inputs enter the build context; sibling repos and secrets don't.
+**
+!Dockerfile
+!tools/
+!tools/jail-entrypoint.sh
+!tools/codex-entrypoint.sh
+!tools/codex-context.py
+!tools/upload/
+!tools/upload/upload.py

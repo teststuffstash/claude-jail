@@ -47,3 +47,6 @@ hardware/
 __pycache__/
 *.pyc
 
+
+# Native Codex jail state (auth, sessions, config)
+/.codex-jail/

@@ -1,4 +1,4 @@
-FROM node:22-bookworm
+FROM node:22-bookworm AS jail-base
 
 ARG HOST_UID=1000
 ARG HOST_GID=1000
@@ -66,3 +66,19 @@ WORKDIR /workspace
 # the whole group (-g) so both claude and the server stop cleanly.
 ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/jail-entrypoint.sh"]
 CMD ["claude"]
+
+# Codex reuses the jail toolchain, with its own entrypoint and persistent state.
+FROM jail-base AS codex
+USER root
+ARG CODEX_VERSION=0.155.1
+RUN npm install -g @openai/codex@${CODEX_VERSION}
+COPY tools/codex-entrypoint.sh /usr/local/bin/codex-entrypoint.sh
+COPY tools/codex-context.py /opt/jail/codex-context.py
+COPY tools/upload/upload.py /opt/jail/upload.py
+RUN chmod 0755 /usr/local/bin/codex-entrypoint.sh
+USER node
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/codex-entrypoint.sh"]
+CMD ["codex"]
+
+# Preserve the default image used by existing Claude compose services.
+FROM jail-base AS claude

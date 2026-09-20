@@ -1,5 +1,102 @@
 # Claude Code — Docker Jail
 
+## Native Codex jail
+
+Codex has a standalone launcher and Compose file. It shares the image toolchain
+and upload server with Claude, but keeps its own configuration, authentication,
+and session state. No stack registry or platform workflow is required.
+
+```bash
+tools/codex-jail.sh --project /path/to/repo --name my-repo --build
+tools/codex-jail.sh --project /path/to/repo --name my-repo --login
+tools/codex-jail.sh --project /path/to/repo --name my-repo
+tools/codex-jail.sh --project /path/to/repo --name my-repo -- codex resume --last
+```
+
+Login uses the **ChatGPT subscription**, with device authentication (enable device
+code login in your ChatGPT security settings). Follow the URL and code printed by
+Codex. There is no callback port or host-auth copy. See the official
+[authentication documentation](https://learn.chatgpt.com/docs/auth).
+
+Each name persists a complete `CODEX_HOME` in `.codex-jail/<name>/` (gitignored,
+created mode 0700). Use the same name and project for resume; switching the project
+under an existing name is rejected. Config is seeded once with ChatGPT-only login
+and file credential storage. The launcher adds
+`--dangerously-bypass-approvals-and-sandbox` to Codex commands, including resume
+and exec: Docker is the permission boundary, matching the Claude jail's bypass
+mode. Model selection retains its CLI default. Pass Codex options after `--`
+as needed. This mounts the selected
+project read-write at `/workspace/<repository-name>` (for example, `/workspace/homelab`), the jail state, and the existing shared
+`/nix` store. Selecting the Projects root exposes its entire contents, just as the
+Claude mono jail does. Select an individual repository for a narrower mount. `--mono` mounts the entire
+Projects/jail repository at `/workspace` while keeping the selected project as the
+working directory. The `homelab-codex` alias uses this mode, matching Claude
+`homelab` and `homelab-go`, so sibling projects are visible.
+
+The `homelab-codex` alias also enables `--homelab-wallet`, mounting the existing
+`.claude-data/homelab-keepass` and `.claude-data/homelab-pve-ssh` directories read-only
+at their matching `/home/node/.claude/` paths. The launcher checks the database,
+keyfile, and SSH key exist before starting. Restore missing cache files on the host
+with `CLAUDE_CRED_DIR=~/Projects/.claude-data bash ~/Projects/homelab/scripts/wallet-files.sh`.
+Other service files regenerated inside the jail persist in
+`.codex-jail/<name>/service-credentials`, mounted at `~/.claude`; the wallet and
+management key remain read-only overlays. Mono mode also mounts the existing
+`.claude-data.gitconfig` read-only when present, matching the Claude jail identity.
+
+When homelab is mounted, startup links `/home/node/.agents/skills` to
+`/workspace/homelab/.claude/skills`. This container-local link exposes the skills
+to Codex without modifying homelab’s `.agents` directory. Existing user skill
+directories are preserved.
+
+At startup, the mono homelab seat refreshes `CLAUDE.local.md` directly from
+`agents/jail-seat-card.md`, then merges `CLAUDE.md` and `CLAUDE.local.md` into
+`AGENTS.md`. Generated files are replaced atomically and `AGENTS.md` is locally
+ignored through `.git/info/exclude`. A missing seat source or hand-written local
+card stops startup rather than silently using stale content. Other project
+launches merge their existing Claude files without importing homelab procedure.
+
+Native or tracked `AGENTS.md` files are preserved and used as-is; startup reports
+that the Claude merge was skipped. `AGENTS.override.md` still takes precedence.
+A separate small container environment card is refreshed in `$CODEX_HOME/AGENTS.md`
+unless you already maintain that file yourself. Claude-specific tools/hooks are
+not translated by this merge; Codex's instruction size limit still applies.
+
+The upload inbox is `uploads/` within the selected project. Its UI is available at
+`http://127.0.0.1:8021`; use `--port` for concurrent jails. `--shell` opens zsh.
+Container shutdown uses the existing tini process-group forwarding mechanism.
+
+`--env-file /path/to/runtime.env` explicitly injects runtime-provisioned variables
+(requires Compose with `run --env-from-file`). The `homelab-codex` alias passes `~/Projects/.env`, matching the Claude mono-jail.
+Other launches only read a runtime env file when explicitly supplied. The launcher
+does not mint tokens or copy host credentials. `GH_TOKEN`, when provisioned,
+uses a container-local git credential store. Set git author identity in the project
+or through runtime `GIT_AUTHOR_*`/`GIT_COMMITTER_*` variables. Other service variables
+are available to the runtime; existing stack-specific kube provisioning is not
+automatically run by this standalone launcher.
+
+For optional Codex OTLP logs, edit `.codex-jail/<name>/config.toml` after first launch
+using the actual runtime-provisioned endpoint and authentication:
+
+```toml
+[otel]
+environment = "jail"
+log_user_prompt = false
+exporter = { otlp-http = { endpoint = "https://YOUR-COLLECTOR/v1/logs", protocol = "binary" } }
+```
+
+This is native Codex telemetry, with different event names and accounting from
+Claude. See [official telemetry configuration](https://learn.chatgpt.com/docs/config-file/config-advanced).
+Collector delivery, Garage transcript sync, monitor signals, and Claude transcript
+consumers still need runtime verification/adapters; persisting `CODEX_HOME` does
+not upload transcripts. Never upload the entire state directory: it contains auth.
+The tracked jail source has no transcript-sync implementation to reuse.
+
+Builds pin Codex **0.155.1**; set `CODEX_VERSION` explicitly to test an upgrade. `.dockerignore` limits the build context to image inputs,
+excluding runtime secrets and sibling checkouts. Local launcher checks:
+`python3 tools/test_codex_jail.py` and `python3 tools/test_codex_context.py`. After building the `codex-jail-codex` image,
+run `python3 tools/test_codex_container.py` for offline container smoke tests
+(temporary fixture mounts only). Verified with Codex 0.155.1 and Claude 2.1.278.
+
 Runs Claude Code in an isolated Docker container with full permissions, persistent memory, and host file access. Files written inside the container are owned by your host user.
 
 ## Architecture

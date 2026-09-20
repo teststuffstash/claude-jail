@@ -1,0 +1,31 @@
+# Standalone: no automatic merge with the Claude compose/host overrides.
+services:
+  codex:
+    build:
+      context: .
+      target: codex
+      args:
+        HOST_UID: ${JAIL_UID:?Use tools/codex-jail.sh}
+        HOST_GID: ${JAIL_GID:?Use tools/codex-jail.sh}
+        CODEX_VERSION: ${CODEX_VERSION:-0.155.1}
+    working_dir: ${JAIL_WORKDIR:?Use tools/codex-jail.sh}
+    environment:
+      JAIL_HOMELAB_SEAT: ${JAIL_HOMELAB_SEAT:-0}
+      CODEX_HOME: /home/node/.codex
+      UPLOAD_DIR: ${JAIL_WORKDIR:?Use tools/codex-jail.sh}/uploads
+      TERM: ${TERM:-xterm-256color}
+      TZ: ${TZ:-Europe/Tallinn}
+    volumes:
+      - type: bind
+        source: ${JAIL_MOUNT_SOURCE:?Use tools/codex-jail.sh}
+        target: ${JAIL_MOUNT_TARGET:?Use tools/codex-jail.sh}
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${JAIL_STATE:?Use tools/codex-jail.sh}
+        target: /home/node/.codex
+        bind:
+          create_host_path: false
+      - /nix:/nix
+    stdin_open: true
+    tty: true
