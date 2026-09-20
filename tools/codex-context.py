@@ -41,6 +41,11 @@ def bootstrap(project, codex_home, seat=False):
 - Source instructions may mention Claude-specific commands or hooks; those require
   a Codex equivalent and are not automatically implemented by reading this card.
 ''')
+        if os.environ.get('STACK_NAME'):
+            # The rendered prefix contains presence/scope only, never token values.
+            # Omit the Claude-specific shared tail; the runtime facts above replace it.
+            stack_card = Path('/workspace/CLAUDE.local.md').read_text().split('\n---\n', 1)[0]
+            atomic_write(global_card, global_card.read_text() + '\n' + stack_card + '\n')
     else:
         print('codex-context: preserving user global AGENTS.md; environment card not generated')
     if seat:

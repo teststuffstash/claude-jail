@@ -120,3 +120,20 @@ launcher/image/context work. Continue runtime integration in this jail repositor
 The original edits to tools/stack-jail.sh and tools/stack-jail-init.sh predate this
 build and are excluded from the jail-build commit. Unrelated untracked directories
 and files were left alone. No PR, push, deployment, watcher, or automation created.
+
+## Codex stacks — 2026-09-20
+
+Added stack-jail.sh --codex and oracle-codex, using the original scoped stack
+provisioning. Codex state/auth is separate per stack (.codex-jail/stack-<name>);
+Oracle upload port 8037, cwd /workspace/oracle-fleet. No mono wallet/auth or host
+homelab mounts. The shared initializer supplies per-repo credentials and kubeconfig
+before Codex startup; its rendered card is included in global context without
+the Claude-specific shared tail. No homelab seat or skill symlink in Codex stacks.
+
+4 additional launcher tests passed, including Claude regression and build without
+provisioning. Rebuilt image passed both mono and stack offline container checks.
+Stack fixture verified scoped Git (including rejection for an unrelated repo),
+namespace kubeconfig, secret-free card, cwd, project context, and no homelab seat/
+skill leakage. No real Oracle credentials, token mint, clone, GitHub call, or cluster
+request used during validation. Live login and stack service access remain in-jail
+checks. Read-only Oracle reference mounts that predate this work remain uncommitted.

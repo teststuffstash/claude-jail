@@ -19,6 +19,7 @@ Load the shortcuts with `source ~/Projects/.aliases`.
 | `sleep-tracking-or` | Claude Code through the project's OpenRouter wrapper | Same mono-jail mounts |
 | `homelab-go` | Claude Code with a local model-routing shim for OpenCode Go/Zen | Same mono-jail mounts |
 | `oracle`, `sleep-jail`, `platform-jail`, `circles` | Claude Code with stack-scoped provisioning | Selected repositories and read-only extras |
+| `oracle-codex` | Native Codex with stack-scoped provisioning | Same Oracle repository/credential scope as `oracle` |
 | `homelab-codex` | Native Codex, ChatGPT subscription login | All Projects mounted; working directory `/workspace/homelab` |
 | `tools/codex-jail.sh --project DIR` | Native Codex | Selected project only, unless `--mono` is supplied |
 
@@ -142,6 +143,39 @@ The homelab alias selects `--mono`, loads `~/Projects/.env`, and enables
 `--homelab-wallet`. Projects is mounted at `/workspace`, the working directory is
 `/workspace/homelab`, and uploads are published on loopback port **8022**.
 
+### Codex stack sessions
+
+```bash
+source ~/Projects/.aliases
+oracle-codex --build
+oracle-codex --login
+oracle-codex
+oracle-codex -- resume --last
+# Other existing stacks use the same runtime selector:
+tools/stack-jail.sh sleep --codex
+```
+
+`oracle-codex` runs in `/workspace/oracle-fleet`, publishes uploads at
+`http://127.0.0.1:8037`, and persists its independent ChatGPT login and sessions in
+`.codex-jail/stack-oracle`. It uses `.env.oracle`, the existing per-repository Git
+credential routing, bounded Kubernetes token provisioning, scoped project mounts,
+read-only extras, and per-stack handoff directory. It does not mount all Projects,
+the host homelab checkout, the mono wallet, or either runtime's mono auth state.
+
+The Codex stack service uses the same Codex image, with the shared stack initializer
+running before Codex startup. Its rendered stack card is included in Codex's global
+instructions; the selected project's Claude files are merged normally. No homelab
+seat card or global homelab skill symlink is installed. Native repository
+`.agents/skills` remain available through Codex's normal discovery.
+
+`--login` uses device authentication, so no Claude callback port is needed.
+Arguments after `--` are Codex arguments (unlike the standalone launcher, do not
+repeat `codex`). Codex stack upload ports are the Claude stack ports plus 20:
+Oracle 8037, sleep 8038, platform 8039, circles 8040. `--build` only builds the image
+and does not mint operational credentials. Actual launches retain the existing
+stack provisioning behavior, including its warning-and-continue path if the
+Kubernetes token cannot be minted.
+
 ### Other projects and launch options
 
 ```bash
@@ -248,6 +282,7 @@ belong in a commit. Logs are at `/tmp/upload-server.log`. See
 | `sleep-jail` | 8018 | With `--login` |
 | `platform-jail` | 8019 | With `--login` |
 | `circles` | 8020 | With `--login` |
+| `oracle-codex` | 8037 | Device login; no callback port |
 | `homelab-codex` | 8022 | Device login; no callback port |
 
 Open `http://localhost:<port>`. A generic Codex launch defaults to **8021**.
@@ -283,8 +318,10 @@ rewrites the generated override; review local customizations first.
 ```bash
 python3 tools/test_codex_jail.py
 python3 tools/test_codex_context.py
+python3 tools/test_codex_stack.py
 # After building the codex-jail-codex image; temporary fixtures, network disabled:
 python3 tools/test_codex_container.py
+python3 tools/test_codex_stack_container.py
 ```
 
 The host build was validated with Codex 0.155.1 and Claude 2.1.278. These checks

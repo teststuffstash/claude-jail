@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # stack-jail — host-side launcher for a per-stack jail (the credential airlock).
 #
-#   stack-jail.sh <stack> [--login]
+#   stack-jail.sh <stack> [--codex] [--build | --login] [-- CODEX_ARGS...]
 #
 # Per-stack jails supersede launching everything through the mono claude-jail.
 # Middle-ground permission model (decided 2026-07-12):
@@ -35,7 +35,28 @@ set -euo pipefail
 PROJECTS="${HOME}/Projects"
 STACK="${1:-}"; shift || true
 LOGIN=0
-[ "${1:-}" = "--login" ] && LOGIN=1
+RUNTIME=claude
+BUILD=0
+ARGS=()
+while (($#)); do
+  case "$1" in
+    --codex) RUNTIME=codex; shift;;
+    --login) LOGIN=1; shift;;
+    --build) BUILD=1; shift;;
+    --) shift; ARGS=("$@"); break;;
+    *) echo "Unknown option: $1" >&2; exit 2;;
+  esac
+done
+if [[ $RUNTIME == claude && ${#ARGS[@]} != 0 ]]; then
+  echo 'Extra CLI arguments currently require --codex' >&2; exit 2
+fi
+if [[ $BUILD == 1 ]]; then
+  if [[ $RUNTIME == codex ]]; then
+    export JAIL_UID="$(id -u)" JAIL_GID="$(id -g)" JAIL_ROOT="$PROJECTS"
+    exec docker compose --env-file /dev/null -p codex-jail -f "$PROJECTS/docker-compose.codex-stack.yml" build codex-stack
+  fi
+  exec docker compose -f "$PROJECTS/docker-compose.yml" build stack
+fi
 
 # ── Derived half: stacks.json is the authority for what a stack IS ──────────────────────────
 STACKS_JSON="$PROJECTS/homelab/agents/stacks.json"
@@ -78,6 +99,7 @@ KUBE_SA="$STACK-workbench"
 
 ENV_FILE="$PROJECTS/.env.$STACK"
 STATE_DIR="$PROJECTS/.claude-data-$STACK"
+[[ $RUNTIME == codex ]] && STATE_DIR="$PROJECTS/.codex-jail/stack-$STACK"
 CLAUDE_JSON="$PROJECTS/.claude-data-$STACK.json"
 PREFIX=$(printf '%s' "$STACK" | tr 'a-z-' 'A-Z_')
 
@@ -85,12 +107,14 @@ PREFIX=$(printf '%s' "$STACK" | tr 'a-z-' 'A-Z_')
 # .claude.json must be VALID JSON — an empty file reads as "corrupted: Unexpected
 # EOF" and gets backed up + reset on every launch. Seed {} if missing/empty.
 mkdir -p "$STATE_DIR"
-[ -s "$CLAUDE_JSON" ] || echo '{}' > "$CLAUDE_JSON"
-touch "$PROJECTS/.claude-data-$STACK.zsh_history"
-# Cross-jail handoff channel (tools/handoff.md): only THIS stack's subtree is
-# mounted, so a stack jail never sees another stack's traffic.
+if [[ $RUNTIME == claude ]]; then
+  [ -s "$CLAUDE_JSON" ] || echo '{}' > "$CLAUDE_JSON"
+  touch "$PROJECTS/.claude-data-$STACK.zsh_history"
+fi
+# Cross-jail handoff channel: only this stack's subtree is mounted.
 mkdir -p "$PROJECTS/.handoff/$STACK"/{inbox,doing,done}
 
+if [[ $RUNTIME == claude ]]; then
 # Bootstrap the stack jail's Claude config from the mono jail's solved state —
 # otherwise every new stack jail re-runs onboarding (theme/trust prompts) and
 # loses the bypass-permissions setup. Two pieces, both idempotent:
@@ -132,6 +156,8 @@ for p in dirs:
     entry.setdefault("hasCompletedProjectOnboarding", True)
 json.dump(d, open(target, "w"), indent=2)
 PYEOF
+
+fi
 
 if [ ! -f "$ENV_FILE" ]; then
   cat > "$ENV_FILE" <<EOF
@@ -218,22 +244,40 @@ export STACK_KUBE_TOKEN STACK_KUBE_SERVER STACK_KUBE_CA
 
 # Shared-login mount source must EXIST as a file, or docker creates a root-owned
 # directory at the target and login breaks in every jail.
-if [ ! -f "$PROJECTS/.claude-data/.credentials.json" ]; then
+if [[ $RUNTIME == claude ]] && [ ! -f "$PROJECTS/.claude-data/.credentials.json" ]; then
   echo "⚠ $PROJECTS/.claude-data/.credentials.json missing — log in via the mono jail (main) first" >&2
   exit 1
 fi
 
-VOLS=(
-  -v "$STATE_DIR:/home/node/.claude"
-  -v "$CLAUDE_JSON:/home/node/.claude.json"
-  -v "$PROJECTS/.claude-data-$STACK.zsh_history:/home/node/.zsh_history"
-  -v "$PROJECTS/.handoff/$STACK:/workspace/.handoff"
-)
+VOLS=(-v "$PROJECTS/.handoff/$STACK:/workspace/.handoff")
+if [[ $RUNTIME == codex ]]; then
+  chmod 700 "$STATE_DIR"
+  VOLS+=(-v "$STATE_DIR:/home/node/.codex")
+else
+  VOLS+=(
+    -v "$STATE_DIR:/home/node/.claude"
+    -v "$CLAUDE_JSON:/home/node/.claude.json"
+    -v "$PROJECTS/.claude-data-$STACK.zsh_history:/home/node/.zsh_history"
+  )
+fi
 for m in $MOUNTS; do
   dir="${m%%:*}"; suffix=""
   [ "$m" != "$dir" ] && suffix=":${m#*:}"
   VOLS+=(-v "$PROJECTS/$dir:/workspace/$dir$suffix")
 done
+
+if [[ $RUNTIME == codex ]]; then
+  export JAIL_UID="$(id -u)" JAIL_GID="$(id -g)" JAIL_ROOT="$PROJECTS"
+  export STACK_MAIN_DIR="$MAIN_DIR"
+  COMMAND=(codex --dangerously-bypass-approvals-and-sandbox "${ARGS[@]}")
+  [[ $LOGIN == 0 ]] || COMMAND=(codex login --device-auth)
+  # 8037..8040: a distinct port range from the Claude stacks and mono Codex.
+  exec docker compose --env-file /dev/null -p codex-jail -f "$PROJECTS/docker-compose.codex-stack.yml" run --rm \
+    -p "127.0.0.1:$((UPLOAD_PORT + 20)):8000" "${VOLS[@]}" \
+    -e UPLOAD_DIR -e STACK_MAIN_DIR -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
+    -e STACK_KUBE_TOKEN -e STACK_KUBE_SERVER -e STACK_KUBE_CA -e STACK_KUBE_NS \
+    codex-stack "${COMMAND[@]}"
+fi
 
 PORTS=(-p "$UPLOAD_PORT:8000")
 [ "$LOGIN" = 1 ] && PORTS+=(-p 54545:54545)

@@ -23,6 +23,7 @@ alias teststuff='JAIL_NAME=teststuff UPLOAD_DIR=/workspace/teststuff/uploads doc
 # Shares the mono jail's login (.credentials.json mount) — no /login needed;
 # `oracle --login` exists only for re-auth edge cases (maps 54545, not while main runs).
 alias oracle='~/Projects/tools/stack-jail.sh oracle'
+alias oracle-codex='~/Projects/tools/stack-jail.sh oracle --codex'
 alias sleep-jail='~/Projects/tools/stack-jail.sh sleep'
 alias platform-jail='~/Projects/tools/stack-jail.sh platform'
 alias circles='~/Projects/tools/stack-jail.sh circles'
