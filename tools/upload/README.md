@@ -1,36 +1,47 @@
 # upload — minimal file-drop server
 
-Stdlib-only Python server for getting screenshots and documents from your host into the jail's filesystem. Paste from clipboard, drop files, or pick from disk.
+Stdlib-only Python server for getting screenshots and documents into the jail.
+Paste from the clipboard, drop files, or pick them from disk.
 
-## Run
+## Automatic startup
 
-The server **starts automatically** with every jail session — `tini` (PID 1, set in the `Dockerfile`) launches it in the background via `tools/jail-entrypoint.sh` before handing the terminal to `claude`. It serves on container port `8000`, dropping files into `$UPLOAD_DIR` — each project's gitignored `uploads/` inbox (set per project in `.aliases`). Move files out of `uploads/` to commit them. Logs go to `/tmp/upload-server.log` inside the container.
+Both Claude and Codex entrypoints start the server on container port `8000` before
+launching the main command. Files go to `$UPLOAD_DIR`, normally the project's
+`uploads/` inbox. Logs go to `/tmp/upload-server.log`. Ensure the inbox is gitignored;
+move files out when they should be committed.
 
-Just open the host port for your session and paste (Ctrl/Cmd+V), drop, or click:
+The host port belongs to the launcher/alias, not the server. See the complete
+[port table](../../README.md#upload-inbox-and-ports) in the main README. For example,
+`homelab` uses [localhost:8002](http://localhost:8002), `homelab-go` uses
+[localhost:8012](http://localhost:8012), and `homelab-codex` uses
+[localhost:8022](http://localhost:8022). `idp-or` publishes no upload port.
 
-- main (`~/Projects`) → <http://localhost:8000>
-- car-fleet → <http://localhost:8001>
-- homelab → <http://localhost:8002>
-- life → <http://localhost:8003>
+The Claude OAuth callback is separate from uploads: `main`, or a stack session
+launched with `--login`, publishes `54545`. Codex uses device login without a
+callback port.
 
-To run it manually against a different folder, note the auto-started instance already holds `8000` — give the manual one another port (only `8000` is forwarded to the host, so reach others via `docker compose port` or by adding them to `ports:`):
+## Manual operation
+
+The auto-started instance already owns `8000`. For a second server, choose another
+container port and publish it when creating the container:
 
 ```bash
 python3 /workspace/tools/upload/upload.py --dir /workspace/car-fleet/volvo-xc90-2006 --port 8100
 ```
 
-### Ports & multiple sessions
+That workspace script exists in mono jails; the Codex image also contains
+`/opt/jail/upload.py`, which works in a project-only jail. Add an explicit Docker
+port mapping such as `-p 127.0.0.1:8100:8100` to reach the second server from the
+host. `docker compose port` only reports an existing mapping; it does not create one.
 
-- The container always serves on `8000`. Each alias in `.aliases` publishes its own **host** port with `-p host:8000`, so several sessions can run at once without colliding. `docker-compose.yml` declares no `ports:`.
-- Only the **main** jail (run from `~/Projects`) also maps `-p 54545:54545`, so it's the only one that can complete `/login` — the callback URL is fixed to `localhost:54545`. The project jails don't publish it. Log in once via `main`; the token persists in `.claude-data/` and works in every session.
-- To add or change a port, edit the `-p` flag in that alias (and re-source `.aliases`).
+## API and exposure
 
-## What it does
+- `POST /upload` with an `X-Filename` header saves the raw body into the inbox.
+- Name collisions are renamed to `name-1.ext`, and so on.
+- Pasted images receive a `paste-YYYYMMDD-HHMMSS.png` filename.
+- No authentication or HTTPS. Codex publishes on host loopback; existing Claude
+  aliases use Docker's unspecified host binding. Do not expose the UI publicly.
 
-- `POST /upload` with `X-Filename` header → saves raw body to `<dir>/<filename>`. Name collisions auto-rename to `name-1.ext`.
-- Pasted images get auto-named `paste-YYYYMMDD-HHMMSS.png`.
-- No auth, no HTTPS. Local jail tool only — do **not** expose to the internet.
-
-## Why stdlib
-
-The container has no pip and runs as a non-root user. `http.server` + a tiny request handler avoids the install dance entirely.
+The server uses Python's `http.server` and standard library only; no pip packages
+are required. `tini` forwards container stop signals to the runtime and upload
+server together.
