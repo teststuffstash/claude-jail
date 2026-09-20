@@ -43,6 +43,14 @@ RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/node && \
 # to populate the shared store; the jail consumes it via `devbox shell`.
 RUN curl -fsSL https://get.jetify.com/devbox | bash -s -- -f && \
     chmod 0755 /usr/local/bin/devbox
+# The install script ships a LAUNCHER that runs whatever devbox is latest that day — and every
+# devbox release bakes its own plugin versions, which it rewrites into devbox.lock on ANY
+# `devbox run` (nodejs plugin 0.0.4 up to 0.18.1, 0.0.5 from 0.18.2). An unpinned jail therefore
+# dirties every project's lock the day upstream releases (homelab FU-240: the lock flip-flopped
+# 0.0.4<->0.0.5 four times in a week). Pin the launcher to the SAME version the CI runner image
+# bakes (homelab docker/arc-runner/Dockerfile ARG DEVBOX_VERSION) — CI's weekly `devbox update`
+# is what writes the committed lock. Bump both in one change, with the lock.
+ENV DEVBOX_USE_VERSION=0.18.3
 ENV PATH="/nix/var/nix/profiles/default/bin:${PATH}"
 
 # Nix multi-user build users. devbox's `print-dev-env` (run inside the jail) reads the
