@@ -59,3 +59,10 @@ catalog, never repeat a remembered status** (Postgres sat in this very sentence 
   act on what you find, not on a reconstruction. Questions like "is this already tracked
   somewhere?" are retrieval requests (the user half-remembers, without the exact
   place/id), not decisions delegated to you.
+- **Wait on PRs with `pr-wait`, never a hand-rolled `gh` loop.** Every jail's PAT is the
+  operator's identity, and GitHub pools rate limits per USER, not per token: all jails
+  and their subagents share ONE 5000/hr pool (2026-10-10: a subagent's poll loop drained
+  it, stalling every jail's reviews). Wait on a PR (review verdict, CI, merge) with
+  `bash /workspace/homelab/scripts/pr-wait.sh <pr> [<pr> …] --repo teststuffstash/<repo>`
+  run in the BACKGROUND (`--no-arm` if auto-merge must not be armed). Several PRs = one
+  call. No other GitHub polling faster than once a minute.
