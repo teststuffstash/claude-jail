@@ -143,6 +143,44 @@ To run several sessions at once without port clashes, the **container** always s
 
 The **main** jail runs from `~/Projects` for general/infra work and is the only session that maps the OAuth port, so it's the only one that can complete `/login` (the callback is fixed to `localhost:54545`). The project jails don't publish it at all. Log in once via `main`; the token persists in `.claude-data/` and works in every other session.
 
+## Browser sidecar
+
+Every jail has a browser without any jail image carrying one. The compose service `browser`
+runs the upstream Playwright MCP image (`mcr.microsoft.com/playwright/mcp`, headless Chromium
++ the MCP server in one container) once per host, on the external docker network
+`jail-browser`, with no published port — only containers on that network reach it, at
+`http://jail-browser:8931/mcp`. The jail entrypoint registers that URL as the user-scope
+`browser` MCP server in the jail's `~/.claude.json` (`tools/mcp-register.py`, idempotent),
+so Claude Code sees `mcp__browser__*` tools in every session. Each MCP session gets a fresh
+in-memory browser context; nothing persists between sessions. Design + the alternatives
+weighed (bake into the Dockerfile, an in-cluster browser): claude-jail#5.
+
+The Claude compose services `depends_on: browser`, so a `docker compose run` from any alias
+starts the sidecar if it is not running and leaves it running afterwards (no restart policy:
+after a host reboot the next jail launch brings it back). `setup-env.sh` creates the network;
+the first launch pulls the image (or prefetch it). Host-side verbs:
+
+```bash
+tools/jail-browser.sh up       # ensure network + start/update the sidecar (what the launchers call)
+tools/jail-browser.sh status   # running since when, healthy?
+tools/jail-browser.sh logs -f  # the MCP server's log
+tools/jail-browser.sh down     # stop + remove it (next launch restarts it)
+tools/jail-browser.sh pull     # prefetch the pinned image
+```
+
+The sidecar is hardened like a credential sidecar would be: read-only root, no capabilities,
+no mounts, tmpfs for the profile and output, memory and pid caps. It has exactly the host's
+egress — nothing a jail's own `curl` lacks — and `--allowed-origins`/`--blocked-origins` would
+be politeness, not a boundary. Page content reaching the agent is untrusted input (the jail
+card says so). Bump the image tag in `docker-compose.yml` by hand; this repo has no Renovate.
+Offline tests: `python3 tools/test_mcp_register.py`.
+
+A separately named compose project (a Codex jail launched with `-p …`) joins the same
+network by declaring it `external: true` under `networks:` and passes the URL as
+`JAIL_BROWSER_MCP_URL`; its launcher calls `tools/jail-browser.sh up` first. Codex reads the
+server from `[mcp_servers.browser] url = …` in `config.toml`, which `tools/mcp-register.py
+codex` writes the same way.
+
 ## Cross-jail handoff
 
 During big platform rollouts a stack session (e.g. oracle) often needs quick homelab-side work
@@ -160,4 +198,5 @@ main        # general/infra jail (also where you /login)
 car-fleet   # or homelab / life
 ```
 
-No rebuild needed unless you update the `Dockerfile`. Re-run `setup-env.sh` if your zsh dotfiles change.
+No rebuild needed unless you update the `Dockerfile`. Re-run `setup-env.sh` if your zsh dotfiles change
+(it also creates the `jail-browser` network a fresh host needs before the first launch).

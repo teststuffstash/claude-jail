@@ -18,6 +18,11 @@ services:
       # removed 2026-08-18 (a shared-file value cannot differ per container, and env
       # precedence between the two sources is ambiguity nobody needs).
       OTEL_RESOURCE_ATTRIBUTES: service.name=claude-code,role=jail,stack=jail,jail.name=${JAIL_NAME:-main}
+      # The browser sidecar (service `browser` below): the entrypoint registers this URL as
+      # the `browser` MCP server in ~/.claude.json. Empty = no registration.
+      JAIL_BROWSER_MCP_URL: http://jail-browser:8931/mcp
+    networks: [default, browser]
+    depends_on: [browser]   # `docker compose run` starts dependencies — the aliases need no change
     volumes:
       - ${HOME}/Projects:/workspace
       - ${HOME}/Projects/.claude-data:/home/node/.claude
@@ -66,6 +71,9 @@ services:
       # Same per-jail OTLP identity as the claude service (homelab#566); stack-jail.sh
       # sets JAIL_NAME="<stack>-stack" and passes it through.
       OTEL_RESOURCE_ATTRIBUTES: service.name=claude-code,role=jail,stack=jail,jail.name=${JAIL_NAME:-stack}
+      JAIL_BROWSER_MCP_URL: http://jail-browser:8931/mcp
+    networks: [default, browser]
+    depends_on: [browser]
     volumes:
       # tools/ read-only: the upload server + stack-jail-init.sh live here
       - ${HOME}/Projects/tools:/workspace/tools:ro
@@ -80,3 +88,62 @@ services:
       - /nix:/nix
     stdin_open: true
     tty: true
+
+  # BROWSER SIDECAR — one headless Chromium per host, shared by every jail (Claude mono, Claude
+  # stack, Codex mono, Codex stack), so no jail image bakes Chromium + its ~40 system libraries
+  # and no Dockerfile churns on browser releases. The upstream Playwright MCP image already
+  # bundles the MCP server + Chromium (entrypoint: `node /app/cli.js --headless --browser
+  # chromium --no-sandbox`; `command:` below appends to it). Each MCP session gets its own
+  # in-memory browser context (--isolated, no --shared-browser-context): nothing persists.
+  #   - reachable ONLY on the `jail-browser` docker network (no published port, no host/LAN
+  #     exposure); jails address it as http://jail-browser:8931/mcp (streamable HTTP) and their
+  #     entrypoints register it as the `browser` MCP server (tools/mcp-register.py).
+  #   - --allowed-hosts is the server's DNS-rebinding check: it compares the FULL Host header
+  #     (host:port, lowercased) — keep the port in every entry.
+  #   - --allowed-origins/--blocked-origins are politeness, not a boundary (upstream says so);
+  #     the browser has exactly the host's egress, nothing a jail's `curl` lacks.
+  #   - hardened like a work-variant sidecar: read-only root, no capabilities, no mounts, tmpfs
+  #     for the profile/output/NSS db, memory + pid caps. Chromium is fine with all of that
+  #     because Playwright passes --disable-dev-shm-usage and the image runs as `node` (1000).
+  #   - lifecycle: started by any jail launch (depends_on), left running between sessions, no
+  #     restart policy (gone after a host reboot until the next launch). Host-side verbs:
+  #     tools/jail-browser.sh up|down|status|logs|pull. The network itself is external, created
+  #     by setup-env.sh / jail-browser.sh — the Codex compose projects join the same one.
+  #   - image pin: bump the tag by hand (no Renovate on this repo); releases at
+  #     https://github.com/microsoft/playwright-mcp/releases. Pulls ride mcr.microsoft.com
+  #     directly (the host dockerd mirrors Hub only).
+  browser:
+    image: mcr.microsoft.com/playwright/mcp:v0.0.83
+    container_name: jail-browser
+    command:
+      - --port=8931
+      - --host=0.0.0.0
+      - --isolated
+      - --output-dir=/tmp/playwright-mcp
+      - --user-agent
+      - "Mozilla/5.0 (X11; Linux x86_64) claude-jail browser sidecar (+https://github.com/teststuffstash/claude-jail)"
+      - --allowed-hosts
+      - jail-browser:8931,browser:8931,127.0.0.1:8931,localhost:8931
+    networks: [browser]
+    read_only: true
+    tmpfs: [/tmp, /home/node]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    pids_limit: 512
+    healthcheck:
+      # Any HTTP answer from the MCP endpoint = the server is up (a GET without a session is a
+      # 4xx by design). node's fetch exists in the image; curl does not.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8931/mcp').then(()=>process.exit(0)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  # Shared with docker-compose.codex*.yml (external there too — one network for every jail
+  # on the host). Created by setup-env.sh / tools/jail-browser.sh, never by a compose project,
+  # so no project owns its labels and every project may join it.
+  browser:
+    name: jail-browser
+    external: true

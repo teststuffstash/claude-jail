@@ -45,6 +45,18 @@ if [ -z "${STACK_NAME:-}" ]; then
   fi
 fi
 
+# Browser MCP server (claude-jail#5): the compose service `browser` (a headless Chromium +
+# Playwright MCP sidecar shared by every jail on the host) is handed in as a URL and
+# registered as the user-scope `browser` server in ~/.claude.json — the bind-mounted file
+# (mono: .claude-data.json, stack: .claude-data-<stack>.json), so the registration
+# persists and the next start is a no-op. Idempotent, never clobbers an unparsable file,
+# leaves a user-edited entry alone (tools/mcp-register.py). Both jail classes run THIS
+# entrypoint, so one hook covers them. Empty/unset URL = no browser, no registration.
+if [ -n "${JAIL_BROWSER_MCP_URL:-}" ]; then
+  python3 /workspace/tools/mcp-register.py claude /home/node/.claude.json browser "$JAIL_BROWSER_MCP_URL" \
+    || echo "jail-entrypoint: browser MCP registration failed — this session has NO browser tool" >&2
+fi
+
 # Git credential store (FU-002): keep the GitHub PAT out of remote URLs. The mono
 # jail (whole ~/Projects mounted) has a single GH_TOKEN covering all teststuffstash
 # repos, so one host-level github.com entry suffices — no useHttpPath needed. The

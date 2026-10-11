@@ -235,6 +235,14 @@ for m in $MOUNTS; do
   VOLS+=(-v "$PROJECTS/$dir:/workspace/$dir$suffix")
 done
 
+# Browser sidecar (docker-compose.yml `browser`, claude-jail#5): the compose service also
+# depends_on it, but the external `jail-browser` network must exist first — `up` creates it.
+# A failed up (offline first pull) is a warning: the jail still launches, Claude just reports
+# the `browser` MCP server as unreachable.
+if [ -x "$PROJECTS/tools/jail-browser.sh" ]; then
+  "$PROJECTS/tools/jail-browser.sh" up >&2 || echo "⚠ browser sidecar did not come up — this session's browser MCP server will be unreachable" >&2
+fi
+
 PORTS=(-p "$UPLOAD_PORT:8000")
 [ "$LOGIN" = 1 ] && PORTS+=(-p 54545:54545)
 
