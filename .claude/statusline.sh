@@ -44,7 +44,7 @@ if [ -f "$fivh_cache" ] && [ $((now - $(stat -c %Y "$fivh_cache" 2>/dev/null || 
 else
   since=$(date -u -d '5 hours ago' +%s 2>/dev/null || date -u -v-5H +%s)
   since_iso=$(date -u -d '5 hours ago' '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -u -v-5H '+%Y-%m-%d %H:%M:%S')
-  fivh=$(find /home/node/.claude/projects -name '*.jsonl' -newermt "$since_iso" 2>/dev/null -print0 \
+  fivh=$(find /home/node/.claude/projects -name '*.jsonl' -newermt "$since_iso" -print0 2>/dev/null \
     | xargs -0 -r cat 2>/dev/null \
     | jq -rs --argjson since "$since" '
         [ .[]
@@ -109,7 +109,8 @@ fivh_suffix=""
 left=$(fmt_left "$five_reset")
 [[ -n "$left" ]] && fivh_suffix=" · resets in $left"
 
-# CWD label: map container paths back to host-visible paths.
+# CWD label: map container paths back to host-visible paths (a literal ~ is the point).
+# shellcheck disable=SC2088
 case "$cwd" in
   /workspace)    cwd_short="~/Projects" ;;
   /workspace/*)  cwd_short="~/Projects/${cwd#/workspace/}" ;;
