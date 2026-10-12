@@ -7,6 +7,11 @@ services:
         HOST_GID: ${HOST_GID}
     working_dir: /workspace
     environment:
+      # Set here, not in an override file: every launcher passes `-f docker-compose.yml`,
+      # which stops compose from loading docker-compose.override.yml at all.
+      TZ: ${TZ:-Europe/Tallinn}
+      TERM: xterm-256color
+      COLORTERM: truecolor
       # Folder the auto-started upload server drops files into (a gitignored
       # uploads/ inbox, set per project in .aliases). Server always on port 8000.
       UPLOAD_DIR: ${UPLOAD_DIR:-/workspace/uploads}
@@ -37,6 +42,8 @@ services:
       # Jail-only git identity. Host ~/.gitconfig is deliberately NOT mounted so
       # the jail can use its own author name/email. Edit .claude-data.gitconfig.
       - ${HOME}/Projects/.claude-data.gitconfig:/home/node/.gitconfig
+      # Mono-jail shell history (stack jails get a per-stack file from tools/stack-jail.sh).
+      - ${HOME}/Projects/.claude-data.zsh_history:/home/node/.zsh_history
       # Shared Nix store so Devbox tooling (per-project devbox.json) works identically in
       # the jail and on the host. Requires Nix/Devbox installed on the host (it provides /nix).
       - /nix:/nix
@@ -68,6 +75,9 @@ services:
         HOST_GID: ${HOST_GID}
     working_dir: /workspace
     environment:
+      TZ: ${TZ:-Europe/Tallinn}
+      TERM: xterm-256color
+      COLORTERM: truecolor
       # Same per-jail OTLP identity as the claude service (homelab#566); stack-jail.sh
       # sets JAIL_NAME="<stack>-stack" and passes it through.
       OTEL_RESOURCE_ATTRIBUTES: service.name=claude-code,role=jail,stack=jail,jail.name=${JAIL_NAME:-stack}

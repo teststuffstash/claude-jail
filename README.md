@@ -55,9 +55,10 @@ source .aliases
 ```
 
 `setup-env.sh` writes HOST_UID/HOST_GID into `.env`, creates missing Claude JSON,
-shell-history and jail Git-identity files, and **rewrites**
-`docker-compose.override.yml` for the host's available zsh dotfiles (`claude` and
-`stack` services, `${HOME}`-relative, so a re-run leaves the tracked file unchanged).
+shell-history and jail Git-identity files, and creates the `jail-browser` docker network.
+There is no compose override file: every launcher passes `-f docker-compose.yml`, so
+compose would never load one — timezone and terminal settings live in
+`docker-compose.yml` itself.
 
 The Claude services expect `.claude-data/.credentials.json` to exist as a **file**
 for their shared login mount. The setup script does not create it; check this when
@@ -194,8 +195,7 @@ tools/codex-jail.sh --project /path/to/repo --name my-repo
 | `--shell` | Open zsh; Codex commands manually typed there do not receive the host launcher's bypass flag |
 | `-- COMMAND…` | Forward a command and its arguments to the container |
 
-[docker-compose.codex.yml](docker-compose.codex.yml) is standalone and does not
-load the Claude Compose override. Config is seeded once with ChatGPT-only login
+[docker-compose.codex.yml](docker-compose.codex.yml) is standalone. Config is seeded once with ChatGPT-only login
 and file credential storage. Model selection retains the CLI default. Set
 `CODEX_VERSION` when building to deliberately override the pinned CLI version.
 
@@ -231,10 +231,9 @@ inside wallet-enabled Codex sessions persist in the separate cache directory abo
 Never commit runtime state or export the entire Codex home as a transcript archive:
 it contains authentication data.
 
-Zsh dotfiles/history mounts are optional Claude override configuration. The aliases
-use explicit `-f docker-compose.yml`, so they do not automatically load
-`docker-compose.override.yml`; include both files explicitly if you want those
-mounts. Codex does not currently persist zsh history or mount host shell dotfiles.
+Claude jails persist zsh history (mono: `.claude-data.zsh_history`; stack:
+`.claude-data-<stack>.zsh_history`) but mount no host shell dotfiles (plain zsh, no `.zshrc`).
+Codex does not currently persist zsh history.
 
 ## Startup instructions and skills
 
@@ -375,8 +374,8 @@ Restart containers for mount, environment or startup-card changes. Reload `.alia
 after editing shortcuts. Rebuild when changing Dockerfile **or files copied into the
 image**, including entrypoints, Codex context generation and its baked upload server.
 Claude's upload script is read from the workspace mount. Re-running `setup-env.sh`
-rewrites the generated override (review local customizations first) and creates the
-`jail-browser` network a fresh host needs before the first launch.
+is safe; it also creates the `jail-browser` network a fresh host needs before the first
+launch.
 
 ```bash
 python3 tools/test_codex_jail.py
