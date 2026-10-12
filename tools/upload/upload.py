@@ -4,6 +4,7 @@
 Usage:
     python3 upload.py --dir /path/to/target [--port 8000] [--host 0.0.0.0]
 """
+
 from __future__ import annotations
 
 import argparse
@@ -164,6 +165,7 @@ def make_handler(target_dir: Path):
             raw_name = self.headers.get("X-Filename", "")
             try:
                 from urllib.parse import unquote
+
                 raw_name = unquote(raw_name)
             except Exception:
                 pass

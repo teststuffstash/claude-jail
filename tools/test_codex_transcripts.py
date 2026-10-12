@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fixture tests for the native Codex transcript sync adapter."""
+
 from __future__ import annotations
 
 import os
@@ -27,8 +28,7 @@ with tempfile.TemporaryDirectory() as raw:
     aws_log = tmp / "aws.log"
     write_executable(
         bin_dir / "aws",
-        '#!/bin/sh\nprintf "%s\\n" "$*" > "$AWS_LOG"\n'
-        'printf "upload: fixture to target\\n"\n',
+        '#!/bin/sh\nprintf "%s\\n" "$*" > "$AWS_LOG"\nprintf "upload: fixture to target\\n"\n',
     )
     write_executable(bin_dir / "curl", "#!/bin/sh\nexit 0\n")
     env = dict(
@@ -42,9 +42,7 @@ with tempfile.TemporaryDirectory() as raw:
         JAIL_NAME="homelab-codex",
         GARAGE_S3_ENDPOINT="https://fixture.invalid",
     )
-    result = subprocess.run(
-        ["bash", str(SCRIPT)], env=env, text=True, capture_output=True, check=True
-    )
+    result = subprocess.run(["bash", str(SCRIPT)], env=env, text=True, capture_output=True, check=True)
     invocation = aws_log.read_text()
     assert "s3 sync" in invocation
     assert "s3://jail-transcripts/codex/homelab-codex/sessions" in invocation
@@ -52,9 +50,7 @@ with tempfile.TemporaryDirectory() as raw:
     assert "done — 1 file(s) uploaded" in result.stdout
 
     env["JAIL_NAME"] = "../../escape"
-    invalid = subprocess.run(
-        ["bash", str(SCRIPT)], env=env, text=True, capture_output=True, check=True
-    )
+    invalid = subprocess.run(["bash", str(SCRIPT)], env=env, text=True, capture_output=True, check=True)
     assert "SKIPPED: invalid jail name" in invalid.stdout
 
 print("codex transcript sync fixtures: PASS")
