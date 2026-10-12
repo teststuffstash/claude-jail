@@ -136,7 +136,9 @@ services:
       - jail-browser:8931,browser:8931,127.0.0.1:8931,localhost:8931
     networks: [browser]
     read_only: true
-    tmpfs: [/tmp, /home/node]
+    # /home/node owned by node: a tmpfs mounts root:root 0755, and Chromium (uid 1000) aborts
+    # when it cannot create its crashpad database under $HOME.
+    tmpfs: [/tmp, "/home/node:uid=1000,gid=1000,mode=0700"]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     mem_limit: 2g
