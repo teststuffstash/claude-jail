@@ -378,15 +378,19 @@ is safe; it also creates the `jail-browser` network a fresh host needs before th
 launch.
 
 ```bash
-python3 tools/test_codex_jail.py
-python3 tools/test_codex_context.py
-python3 tools/test_codex_stack.py
-python3 tools/test_codex_transcripts.py
-python3 tools/test_mcp_register.py
+devbox run ci      # lint + every offline test (tools/test_*.py except the container ones)
+devbox run lint    # shellcheck, hadolint, gitleaks (history + uncommitted), ruff check/format
+devbox run fix     # the mechanical part: import order + ruff format
 # After building the codex-jail-codex image; temporary fixtures, network disabled:
 python3 tools/test_codex_container.py
 python3 tools/test_codex_stack_container.py
 ```
+
+`devbox.json` pins the lint tools; `tools/ci.sh` runs them over `git ls-files` only,
+never a directory walk — the repo root is `~/Projects`, and a walk would lint and
+secret-scan every sibling project. For the same reason the ruff config lives in
+`tools/ruff.toml`, not the root. Run `devbox run ci` before pushing: this repo is
+public, there is no CI workflow, and owner pushes to `master` bypass the PR rule.
 
 The host build was validated with Codex 0.155.1 and Claude 2.1.278. These checks
 cover launcher contracts, startup context, mock Git credentials, skills links,

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.2/.schema/devbox.schema.json",
+  "packages": [
+    "shellcheck@0.11.0",
+    "hadolint@2.12.0",
+    "gitleaks@8.30.1",
+    "ruff@0.16.10",
+    "python@3.13"
+  ],
+  "env": {
+    "VENV_DIR": "$HOME/.cache/devbox-venv/claude-jail",
+    "RUFF_CACHE_DIR": "$HOME/.cache/ruff/claude-jail"
+  },
+  "shell": {
+    "init_hook": [],
+    "scripts": {
+      "lint": [
+        "tools/ci.sh lint"
+      ],
+      "fix": [
+        "tools/ci.sh fix"
+      ],
+      "test": [
+        "tools/ci.sh test"
+      ],
+      "ci": [
+        "tools/ci.sh lint",
+        "tools/ci.sh test"
+      ]
+    }
+  }
+}
