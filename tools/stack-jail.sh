@@ -20,8 +20,9 @@
 #
 # ADDING A STACK (since 2026-08-03): REPOS/MOUNTS/KUBE_NS/SA/MAIN_DIR derive from
 # homelab's agents/stacks.json (the claims mirror) — the case block below carries ONLY the
-# jail-owned overlay: UPLOAD_PORT (host allocation) + private extra mounts (e.g. teststuff:ro),
-# which must never appear in the public homelab repo. So: one overlay entry + `.env.<stack>`
+# jail-owned overlay: UPLOAD_PORT (host allocation) + extra read-only mounts — private repos
+# (e.g. teststuff:ro), which must never appear in the public homelab repo, and cross-stack
+# reference repos (e.g. oracle reading the sleep stack's Grafana setup). So: one overlay entry + `.env.<stack>`
 # (created on first run) + the PAT mint. The compose service is generic (`stack`); everything
 # stack-specific travels via `docker compose run -v/-e`. Definition of done:
 # `devbox run stack-lint <stack>` in homelab.
@@ -74,6 +75,7 @@ PY
 )" || { echo "$derived" >&2; exit 2; }
 REPOS="$derived"
 MOUNTS="$REPOS"
+MASKS=""
 
 # ── Jail-owned overlay: port allocation, the PRIMARY (cwd) repo, PRIVATE mounts — the facts
 # that are jail ergonomics or must never appear in the public homelab repo ──────────────────
@@ -82,6 +84,14 @@ case "$STACK" in
     UPLOAD_PORT=8017
     PRIMARY=oracle-fleet
     MOUNTS="$MOUNTS teststuff:ro"   # the private strategy repo rides along read-only
+    # Cross-stack reference (2026-09-01): the sleep stack already did the Grafana setup
+    # (kind + cluster) that oracle-fleet needs — mount it read-only so oracle reads how it
+    # was done instead of reinventing it. Read-only by design: the oracle PAT does not
+    # cover these repos, so nothing could be pushed anyway; changes go via the sleep jail.
+    MOUNTS="$MOUNTS sleep-tracking:ro snore-recorder:ro sleep-iac:ro"
+    # A reference mount is the HOST checkout, gitignored secrets included — mask them
+    # (the sleep stack's OpenRouter key is not oracle's to hold).
+    MASKS="$MASKS sleep-tracking/.openrouter.env"
     ;;
   sleep)     UPLOAD_PORT=8018; PRIMARY=sleep-tracking ;;
   platform)  UPLOAD_PORT=8019; PRIMARY=openrouter-operator ;;
@@ -264,6 +274,11 @@ for m in $MOUNTS; do
   dir="${m%%:*}"; suffix=""
   [ "$m" != "$dir" ] && suffix=":${m#*:}"
   VOLS+=(-v "$PROJECTS/$dir:/workspace/$dir$suffix")
+done
+# Secret files inside mounted host checkouts: shadow each with an empty read-only file.
+# Only existing ones — a missing target would make docker create it in the ro mount.
+for f in $MASKS; do
+  if [ -e "$PROJECTS/$f" ]; then VOLS+=(-v "/dev/null:/workspace/$f:ro"); fi
 done
 
 if [[ $RUNTIME == codex ]]; then
