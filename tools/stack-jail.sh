@@ -53,7 +53,8 @@ if [[ $RUNTIME == claude && ${#ARGS[@]} != 0 ]]; then
 fi
 if [[ $BUILD == 1 ]]; then
   if [[ $RUNTIME == codex ]]; then
-    export JAIL_UID="$(id -u)" JAIL_GID="$(id -g)" JAIL_ROOT="$PROJECTS"
+    JAIL_UID="$(id -u)" JAIL_GID="$(id -g)"
+    export JAIL_UID JAIL_GID JAIL_ROOT="$PROJECTS"
     exec docker compose --env-file /dev/null -p codex-jail -f "$PROJECTS/docker-compose.codex-stack.yml" build codex-stack
   fi
   exec docker compose -f "$PROJECTS/docker-compose.yml" build stack
@@ -151,6 +152,8 @@ PYEOF
 fi
 TRUST_DIRS="/workspace/homelab"
 for m in $MOUNTS; do TRUST_DIRS="$TRUST_DIRS /workspace/${m%%:*}"; done
+# TRUST_DIRS: one argument per directory, by design
+# shellcheck disable=SC2086
 python3 - "$CLAUDE_JSON" "$PROJECTS/.claude-data.json" $TRUST_DIRS <<'PYEOF'
 import json, os, sys
 target, mono_path, dirs = sys.argv[1], sys.argv[2], sys.argv[3:]
@@ -193,7 +196,11 @@ fi
 
 # Normalize the per-stack env names to the generic STACK_* contract that
 # tools/stack-jail-init.sh consumes inside the jail.
-set -a; . "$ENV_FILE"; set +a
+set -a
+# per-stack .env.<stack>, chosen at run time
+# shellcheck source=/dev/null
+. "$ENV_FILE"
+set +a
 pat_var="${PREFIX}_PAT"; hl_var="${PREFIX}_HOMELAB_TOKEN"
 export STACK_NAME="$STACK"
 export JAIL_NAME="${STACK}-stack"   # per-jail OTLP identity (homelab#566) — compose maps it into OTEL_RESOURCE_ATTRIBUTES
@@ -282,7 +289,8 @@ for f in $MASKS; do
 done
 
 if [[ $RUNTIME == codex ]]; then
-  export JAIL_UID="$(id -u)" JAIL_GID="$(id -g)" JAIL_ROOT="$PROJECTS"
+  JAIL_UID="$(id -u)" JAIL_GID="$(id -g)"
+  export JAIL_UID JAIL_GID JAIL_ROOT="$PROJECTS"
   export STACK_MAIN_DIR="$MAIN_DIR"
   COMMAND=(codex --dangerously-bypass-approvals-and-sandbox "${ARGS[@]}")
   [[ $LOGIN == 0 ]] || COMMAND=(codex login --device-auth)

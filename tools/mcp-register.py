@@ -12,6 +12,7 @@ entry, never clobber a file that does not parse, and do nothing when the URL is 
 A user-edited entry under the same name with a different URL is left alone and reported.
 Exit status is 0 whenever the config is left in a valid state; the caller only warns.
 """
+
 import json
 import re
 import sys
@@ -69,7 +70,7 @@ def register_codex(path, name, url):
     m = header.search(text)
     if m:
         # Our own section: the url line directly inside it. Anything else is user-owned.
-        body = text[m.end():]
+        body = text[m.end() :]
         nxt = re.search(r"^\[", body, re.M)
         body = body[: nxt.start()] if nxt else body
         um = re.search(r'^\s*url\s*=\s*"([^"]*)"', body, re.M)
@@ -84,6 +85,7 @@ def register_codex(path, name, url):
     new += block
     try:
         import tomllib  # 3.11+
+
         tomllib.loads(new)
     except ImportError:
         pass

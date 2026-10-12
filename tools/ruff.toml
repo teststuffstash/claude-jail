@@ -1,0 +1,13 @@
+# ruff (devbox run lint, tools/ci.sh) for the stdlib-only Python in tools/. Lives here, not at the
+# repo root: the root is the host's ~/Projects, and a root config would govern every sibling
+# project that has none of its own.
+target-version = "py311"   # the jail image's python3 (bookworm); tomllib is the floor
+line-length = 160
+
+[lint]
+# pycodestyle, pyflakes, isort, pyupgrade, bugbear: PEP 8 and the usual mistakes.
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[lint.per-file-ignores]
+# Tests embed fixture scripts and env maps as single string literals the formatter cannot split.
+"test_*.py" = ["E501"]

@@ -1,4 +1,7 @@
 FROM node:22-bookworm AS jail-base
+# pipefail: several RUNs pipe a download into its consumer (`curl | bash`, `curl | dd`);
+# without it a failed download is masked by the consumer's exit 0 and the build "succeeds".
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ARG HOST_UID=1000
 ARG HOST_GID=1000

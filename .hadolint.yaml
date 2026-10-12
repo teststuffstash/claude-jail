@@ -1,0 +1,8 @@
+# hadolint (devbox run lint, tools/ci.sh) over the Dockerfile.
+ignored:
+  # DL3008 "pin apt versions" / DL3016 "pin npm versions": the image's inputs are "latest at
+  # build time, rebuild to update" by decision — Debian versions are pinned by the base tag and
+  # vanish from the mirrors within weeks, and Claude Code should be current on every rebuild.
+  # What IS pinned on purpose (Codex, tea + sha256, the devbox launcher) carries its reason inline.
+  - DL3008
+  - DL3016

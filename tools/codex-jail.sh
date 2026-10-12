@@ -15,7 +15,7 @@ Examples:
   tools/codex-jail.sh --project ../my-repo --name my-repo -- codex resume --last
 EOF
 }
-project="$PWD" name=main port=8021 env_file= mode=run mono=0 wallet=0
+project="$PWD" name=main port=8021 env_file='' mode=run mono=0 wallet=0
 command=(codex)
 while (($#)); do
   case "$1" in
@@ -42,11 +42,12 @@ if [[ ${command[0]} == codex ]]; then
   command=(codex --dangerously-bypass-approvals-and-sandbox "${command[@]:1}")
 fi
 [[ $name =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*$ ]] || { echo 'Invalid jail name' >&2; exit 2; }
-[[ $port =~ ^[0-9]{1,5}$ ]] && ((10#$port > 0 && 10#$port < 65536)) || {
-  echo 'Invalid upload port' >&2; exit 2;
-}
-export JAIL_PROJECT="$(cd -- "$project" && pwd -P)"
-export JAIL_WORKDIR="/workspace/$(basename -- "$JAIL_PROJECT")"
+if ! [[ $port =~ ^[0-9]{1,5}$ ]] || ! ((10#$port > 0 && 10#$port < 65536)); then
+  echo 'Invalid upload port' >&2; exit 2
+fi
+JAIL_PROJECT="$(cd -- "$project" && pwd -P)"
+JAIL_WORKDIR="/workspace/$(basename -- "$JAIL_PROJECT")"
+export JAIL_PROJECT JAIL_WORKDIR
 export JAIL_MOUNT_SOURCE="$JAIL_PROJECT" JAIL_MOUNT_TARGET="$JAIL_WORKDIR"
 if [[ $mono == 1 ]]; then
   case "$JAIL_PROJECT" in
@@ -66,7 +67,8 @@ export CODEX_OTLP_BASE_ENDPOINT="${CODEX_OTLP_BASE_ENDPOINT:-}"
 if [[ $JAIL_HOMELAB_SEAT == 1 && -z $CODEX_OTLP_BASE_ENDPOINT ]]; then
   CODEX_OTLP_BASE_ENDPOINT=http://192.168.40.29:4318
 fi
-export JAIL_UID="$(id -u)" JAIL_GID="$(id -g)"
+JAIL_UID="$(id -u)" JAIL_GID="$(id -g)"
+export JAIL_UID JAIL_GID
 if [[ -n $env_file ]]; then
   [[ -f $env_file ]] || { echo 'Runtime env file does not exist' >&2; exit 2; }
   env_file="$(cd -- "$(dirname -- "$env_file")" && pwd -P)/$(basename -- "$env_file")"

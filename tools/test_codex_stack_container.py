@@ -1,21 +1,22 @@
 """Offline stack initialization acceptance with fake credentials and a fixture clone."""
+
 import os
-from pathlib import Path
 import subprocess
 import tempfile
+from pathlib import Path
 
-with tempfile.TemporaryDirectory(prefix='codex-stack-smoke-') as temp:
+with tempfile.TemporaryDirectory(prefix="codex-stack-smoke-") as temp:
     root = Path(temp)
-    project = root / 'oracle-fleet'
+    project = root / "oracle-fleet"
     project.mkdir()
-    subprocess.run(['git', 'init', '-q', str(project)], check=True)
-    (project / 'CLAUDE.md').write_text('Oracle fixture facts')
-    clone = root / 'homelab'
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    (project / "CLAUDE.md").write_text("Oracle fixture facts")
+    clone = root / "homelab"
     clone.mkdir()
-    (clone / 'CLAUDE.md').write_text('Public fixture context only')
-    state = root / 'state'
+    (clone / "CLAUDE.md").write_text("Public fixture context only")
+    state = root / "state"
     state.mkdir()
-    verify = '''
+    verify = """
 import os, pathlib, subprocess
 assert os.getcwd() == '/workspace/oracle-fleet'
 card = pathlib.Path(os.environ['CODEX_HOME'], 'AGENTS.md').read_text()
@@ -33,10 +34,26 @@ for repo, expected in [('oracle-fleet', 'fixture-pat'), ('homelab', 'fixture-hom
 result = subprocess.run(['git','credential','fill'], input='protocol=https\\nhost=github.com\\npath=teststuffstash/unrelated\\n\\n', env=dict(os.environ, GIT_TERMINAL_PROMPT='0'), text=True, capture_output=True)
 assert result.returncode != 0
 print('PASS: stack cwd, cards, secret-free context, scoped Git, kube config, no seat/skills leakage')
-'''
-    args = ['docker', 'run', '--rm', '--network', 'none', '--user', f'{os.getuid()}:{os.getgid()}']
-    for source, target, readonly in [(project, '/workspace/oracle-fleet', False), (clone, '/workspace/homelab', True), (state, '/home/node/.codex', False), (Path(__file__).resolve().parent, '/workspace/tools', True)]:
-        args += ['--mount', f'type=bind,source={source},target={target}' + (',readonly' if readonly else '')]
-    for key, value in {'STACK_NAME':'oracle', 'STACK_MAIN_DIR':'/workspace/oracle-fleet', 'STACK_REPOS':'oracle-fleet oracle-iac', 'STACK_PAT':'fixture-pat', 'STACK_HOMELAB_TOKEN':'fixture-homelab', 'STACK_KUBE_TOKEN':'a.b.c', 'STACK_KUBE_SERVER':'https://fixture.invalid', 'STACK_KUBE_CA':'Zml4dHVyZQ==', 'STACK_KUBE_NS':'oracle-fleet', 'UPLOAD_DIR':'/workspace/oracle-fleet/uploads'}.items():
-        args += ['-e', f'{key}={value}']
-    subprocess.run([*args, 'codex-jail-codex', 'python3', '-c', verify], check=True)
+"""
+    args = ["docker", "run", "--rm", "--network", "none", "--user", f"{os.getuid()}:{os.getgid()}"]
+    for source, target, readonly in [
+        (project, "/workspace/oracle-fleet", False),
+        (clone, "/workspace/homelab", True),
+        (state, "/home/node/.codex", False),
+        (Path(__file__).resolve().parent, "/workspace/tools", True),
+    ]:
+        args += ["--mount", f"type=bind,source={source},target={target}" + (",readonly" if readonly else "")]
+    for key, value in {
+        "STACK_NAME": "oracle",
+        "STACK_MAIN_DIR": "/workspace/oracle-fleet",
+        "STACK_REPOS": "oracle-fleet oracle-iac",
+        "STACK_PAT": "fixture-pat",
+        "STACK_HOMELAB_TOKEN": "fixture-homelab",
+        "STACK_KUBE_TOKEN": "a.b.c",
+        "STACK_KUBE_SERVER": "https://fixture.invalid",
+        "STACK_KUBE_CA": "Zml4dHVyZQ==",
+        "STACK_KUBE_NS": "oracle-fleet",
+        "UPLOAD_DIR": "/workspace/oracle-fleet/uploads",
+    }.items():
+        args += ["-e", f"{key}={value}"]
+    subprocess.run([*args, "codex-jail-codex", "python3", "-c", verify], check=True)
