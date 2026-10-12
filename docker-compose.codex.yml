@@ -17,6 +17,9 @@ services:
       UPLOAD_DIR: ${JAIL_WORKDIR:?Use tools/codex-jail.sh}/uploads
       TERM: ${TERM:-xterm-256color}
       TZ: ${TZ:-Europe/Tallinn}
+      # Set by the launcher only when the browser sidecar is up; the entrypoint registers it.
+      JAIL_BROWSER_MCP_URL: ${JAIL_BROWSER_MCP_URL:-}
+    networks: [default, browser]
     volumes:
       - type: bind
         source: ${JAIL_MOUNT_SOURCE:?Use tools/codex-jail.sh}
@@ -31,3 +34,10 @@ services:
       - /nix:/nix
     stdin_open: true
     tty: true
+
+networks:
+  # The browser sidecar's network (docker-compose.yml `browser`). External: created by
+  # tools/jail-browser.sh, which the launcher runs first, so this project may join it.
+  browser:
+    name: jail-browser
+    external: true

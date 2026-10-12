@@ -288,6 +288,20 @@ for f in $MASKS; do
   if [ -e "$PROJECTS/$f" ]; then VOLS+=(-v "/dev/null:/workspace/$f:ro"); fi
 done
 
+# Browser sidecar (docker-compose.yml `browser`, claude-jail#5), both runtimes: the external
+# `jail-browser` network must exist before either compose project joins it — `up` creates it.
+# A failed up (offline first pull) is a warning: the jail still launches without a browser.
+# Claude's compose service carries the URL itself (and depends_on the sidecar, optionally);
+# Codex gets it only when the sidecar is up, and its entrypoint registers it in config.toml.
+export JAIL_BROWSER_MCP_URL=""
+if [ -x "$PROJECTS/tools/jail-browser.sh" ]; then
+  if "$PROJECTS/tools/jail-browser.sh" up >&2; then
+    JAIL_BROWSER_MCP_URL=http://jail-browser:8931/mcp
+  else
+    echo "⚠ browser sidecar did not come up — this session's browser MCP server will be unreachable" >&2
+  fi
+fi
+
 if [[ $RUNTIME == codex ]]; then
   JAIL_UID="$(id -u)" JAIL_GID="$(id -g)"
   export JAIL_UID JAIL_GID JAIL_ROOT="$PROJECTS"
@@ -300,14 +314,6 @@ if [[ $RUNTIME == codex ]]; then
     -e UPLOAD_DIR -e STACK_MAIN_DIR -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
     -e STACK_KUBE_TOKEN -e STACK_KUBE_SERVER -e STACK_KUBE_CA -e STACK_KUBE_NS \
     codex-stack "${COMMAND[@]}"
-fi
-
-# Browser sidecar (docker-compose.yml `browser`, claude-jail#5): the compose service also
-# depends_on it, but the external `jail-browser` network must exist first — `up` creates it.
-# A failed up (offline first pull) is a warning: the jail still launches, Claude just reports
-# the `browser` MCP server as unreachable.
-if [ -x "$PROJECTS/tools/jail-browser.sh" ]; then
-  "$PROJECTS/tools/jail-browser.sh" up >&2 || echo "⚠ browser sidecar did not come up — this session's browser MCP server will be unreachable" >&2
 fi
 
 PORTS=(-p "$UPLOAD_PORT:8000")

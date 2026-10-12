@@ -342,8 +342,9 @@ so Claude Code sees `mcp__browser__*` tools in every session. Each MCP session g
 in-memory browser context; nothing persists between sessions. Design + the alternatives
 weighed (bake into the Dockerfile, an in-cluster browser): claude-jail#5.
 
-The Claude compose services `depends_on: browser`, so a `docker compose run` from any alias
-starts the sidecar if it is not running and leaves it running afterwards (no restart policy:
+The Claude compose services `depends_on: browser` (with `required: false`, compose ≥ 2.20:
+a sidecar that cannot start costs the session its browser, not the session), so a `docker
+compose run` from any alias starts the sidecar if it is not running and leaves it running afterwards (no restart policy:
 after a host reboot the next jail launch brings it back). `setup-env.sh` creates the network;
 the first launch pulls the image (or prefetch it). Host-side verbs:
 
@@ -362,11 +363,11 @@ be politeness, not a boundary. Page content reaching the agent is untrusted inpu
 card says so). Bump the image tag in `docker-compose.yml` by hand; this repo has no Renovate.
 Offline tests: `python3 tools/test_mcp_register.py`.
 
-Not wired for Codex yet. A separately named compose project (a Codex jail launched with
-`-p …`) would join the same network by declaring it `external: true` under `networks:` and pass the URL as
-`JAIL_BROWSER_MCP_URL`, with its launcher calling `tools/jail-browser.sh up` first. Codex reads the
-server from `[mcp_servers.browser] url = …` in `config.toml`, which `tools/mcp-register.py
-codex` already writes (tested) the same way.
+Codex jails (mono and stack) use the same sidecar. Their compose project (`-p codex-jail`)
+joins the external network, and their launchers run `tools/jail-browser.sh up` first and
+pass `JAIL_BROWSER_MCP_URL` only when it succeeded. The Codex entrypoint registers it as
+`[mcp_servers.browser] url = …` in the persistent `config.toml` (`tools/mcp-register.py
+codex`, baked into the image), so a Codex session sees the same `browser` tools.
 
 ## Updates and validation
 

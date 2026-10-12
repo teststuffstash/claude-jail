@@ -15,9 +15,19 @@ services:
       JAIL_HOMELAB_SEAT: "0"
       TERM: ${TERM:-xterm-256color}
       TZ: ${TZ:-Europe/Tallinn}
+      # Set by the launcher only when the browser sidecar is up; the entrypoint registers it.
+      JAIL_BROWSER_MCP_URL: ${JAIL_BROWSER_MCP_URL:-}
+    networks: [default, browser]
     volumes:
       - ${JAIL_ROOT:?Use tools/stack-jail.sh}/tools:/workspace/tools:ro
       - ${JAIL_ROOT:?Use tools/stack-jail.sh}/.claude-data.gitconfig:/home/node/.gitconfig-base:ro
       - /nix:/nix
     stdin_open: true
     tty: true
+
+networks:
+  # The browser sidecar's network (docker-compose.yml `browser`). External: created by
+  # tools/jail-browser.sh, which the launcher runs first, so this project may join it.
+  browser:
+    name: jail-browser
+    external: true

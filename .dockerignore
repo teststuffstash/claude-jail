@@ -5,6 +5,7 @@
 !tools/jail-entrypoint.sh
 !tools/codex-entrypoint.sh
 !tools/codex-context.py
+!tools/mcp-register.py
 !tools/codex-transcripts-sync.sh
 !tools/upload/
 !tools/upload/upload.py

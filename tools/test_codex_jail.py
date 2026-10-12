@@ -75,6 +75,25 @@ class LauncherTest(unittest.TestCase):
         (self.root / ".claude-data/homelab-keepass/homelab.keyx").unlink()
         self.assertEqual(self.run_jail("--mono", "--project", str(project), "--homelab-wallet").returncode, 2)
 
+    def browser_script(self, exit_code):
+        script = self.root / "tools/jail-browser.sh"
+        script.write_text(f'#!/bin/sh\necho "jail-browser $*" >&2\nexit {exit_code}\n')
+        script.chmod(0o755)
+
+    def test_browser_url_only_when_sidecar_is_up(self):
+        for exit_code, url in ((0, "http://jail-browser:8931/mcp"), (1, "")):
+            self.browser_script(exit_code)
+            result = self.run_jail()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("jail-browser up", result.stderr)
+            env = json.loads((self.root / "captured.json").read_text())
+            self.assertEqual(env["JAIL_BROWSER_MCP_URL"], url)
+        self.assertIn("no browser tool", result.stderr)
+
+    def test_no_sidecar_script_no_browser(self):
+        self.assertEqual(self.run_jail().returncode, 0)
+        self.assertEqual(json.loads((self.root / "captured.json").read_text())["JAIL_BROWSER_MCP_URL"], "")
+
     def test_rejects_bad_inputs_and_cross_project_resume(self):
         for args in [("--name", "../escape"), ("--port", "65536"), ("--port", "x"), ("--",)]:
             self.assertEqual(self.run_jail(*args).returncode, 2)

@@ -29,6 +29,13 @@ if [ -z "${STACK_NAME:-}" ] && [ -d /workspace/homelab/.claude/skills ]; then
   fi
 fi
 python3 /opt/jail/codex-context.py
+# Browser sidecar (docker-compose.yml `browser`): the launcher passes the URL only when the
+# sidecar came up. Registered once in the persistent config.toml; idempotent, never touches
+# a user-edited [mcp_servers.browser] (tools/mcp-register.py).
+if [ -n "${JAIL_BROWSER_MCP_URL:-}" ]; then
+  python3 /opt/jail/mcp-register.py codex "$CODEX_HOME/config.toml" browser "$JAIL_BROWSER_MCP_URL" \
+    || echo 'codex-entrypoint: browser MCP registration failed; this session has NO browser tool' >&2
+fi
 python3 /opt/jail/upload.py --dir "${UPLOAD_DIR:-/workspace/project/uploads}" \
   --port 8000 --host 0.0.0.0 >/tmp/upload-server.log 2>&1 &
 if [ "${JAIL_HOMELAB_SEAT:-0}" = 1 ] && [ -x /opt/jail/codex-transcripts-sync.sh ]; then

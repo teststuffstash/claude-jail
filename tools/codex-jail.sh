@@ -103,4 +103,14 @@ if [[ $wallet == 1 ]]; then
   done
 fi
 [[ -z $env_file ]] || opts+=(--env-from-file "$env_file")
+# Browser sidecar: shared with the Claude jails, started from the Claude compose project.
+# A failure only costs this session its browser.
+export JAIL_BROWSER_MCP_URL=""
+if [[ -x $ROOT/tools/jail-browser.sh ]]; then
+  if "$ROOT/tools/jail-browser.sh" up >&2; then
+    JAIL_BROWSER_MCP_URL=http://jail-browser:8931/mcp
+  else
+    echo '⚠ browser sidecar did not come up; this session has no browser tool' >&2
+  fi
+fi
 exec "${compose[@]}" "${opts[@]}" codex "${command[@]}"
