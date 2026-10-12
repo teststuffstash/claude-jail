@@ -34,6 +34,12 @@ GITCONFIG="$HOME/Projects/.claude-data.gitconfig"
 # 	email = you@example.com
 GITCFG
 
+# The browser sidecar's docker network (docker-compose.yml `browser`, tools/jail-browser.sh).
+# EXTERNAL to every compose project so the Claude project and a separately named Codex
+# project can both join it — which means something outside compose has to create it: here,
+# once per host (jail-browser.sh up does the same check before each launch it drives).
+docker network inspect jail-browser >/dev/null 2>&1 || docker network create jail-browser >/dev/null
+
 # Generate docker-compose.override.yml with whichever zsh dotfiles
 # actually exist on the host. Read-only mounts for configs; RW for history
 # and frameworks (so plugin installs/updates persist).

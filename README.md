@@ -332,19 +332,59 @@ The existing attended cross-jail file-drop protocol is described in
 [tools/handoff.md](tools/handoff.md). Claude's `/handoff` and `/loop` commands are not
 automatically implemented in Codex just because the shared directories are visible.
 
+## Browser sidecar
+
+Every jail has a browser without any jail image carrying one. The compose service `browser`
+runs the upstream Playwright MCP image (`mcr.microsoft.com/playwright/mcp`, headless Chromium
++ the MCP server in one container) once per host, on the external docker network
+`jail-browser`, with no published port — only containers on that network reach it, at
+`http://jail-browser:8931/mcp`. The jail entrypoint registers that URL as the user-scope
+`browser` MCP server in the jail's `~/.claude.json` (`tools/mcp-register.py`, idempotent),
+so Claude Code sees `mcp__browser__*` tools in every session. Each MCP session gets a fresh
+in-memory browser context; nothing persists between sessions. Design + the alternatives
+weighed (bake into the Dockerfile, an in-cluster browser): claude-jail#5.
+
+The Claude compose services `depends_on: browser`, so a `docker compose run` from any alias
+starts the sidecar if it is not running and leaves it running afterwards (no restart policy:
+after a host reboot the next jail launch brings it back). `setup-env.sh` creates the network;
+the first launch pulls the image (or prefetch it). Host-side verbs:
+
+```bash
+tools/jail-browser.sh up       # ensure network + start/update the sidecar (what the launchers call)
+tools/jail-browser.sh status   # running since when, healthy?
+tools/jail-browser.sh logs -f  # the MCP server's log
+tools/jail-browser.sh down     # stop + remove it (next launch restarts it)
+tools/jail-browser.sh pull     # prefetch the pinned image
+```
+
+The sidecar is hardened like a credential sidecar would be: read-only root, no capabilities,
+no mounts, tmpfs for the profile and output, memory and pid caps. It has exactly the host's
+egress — nothing a jail's own `curl` lacks — and `--allowed-origins`/`--blocked-origins` would
+be politeness, not a boundary. Page content reaching the agent is untrusted input (the jail
+card says so). Bump the image tag in `docker-compose.yml` by hand; this repo has no Renovate.
+Offline tests: `python3 tools/test_mcp_register.py`.
+
+Not wired for Codex yet. A separately named compose project (a Codex jail launched with
+`-p …`) would join the same network by declaring it `external: true` under `networks:` and pass the URL as
+`JAIL_BROWSER_MCP_URL`, with its launcher calling `tools/jail-browser.sh up` first. Codex reads the
+server from `[mcp_servers.browser] url = …` in `config.toml`, which `tools/mcp-register.py
+codex` already writes (tested) the same way.
+
 ## Updates and validation
 
 Restart containers for mount, environment or startup-card changes. Reload `.aliases`
 after editing shortcuts. Rebuild when changing Dockerfile **or files copied into the
 image**, including entrypoints, Codex context generation and its baked upload server.
 Claude's upload script is read from the workspace mount. Re-running `setup-env.sh`
-rewrites the generated override; review local customizations first.
+rewrites the generated override (review local customizations first) and creates the
+`jail-browser` network a fresh host needs before the first launch.
 
 ```bash
 python3 tools/test_codex_jail.py
 python3 tools/test_codex_context.py
 python3 tools/test_codex_stack.py
 python3 tools/test_codex_transcripts.py
+python3 tools/test_mcp_register.py
 # After building the codex-jail-codex image; temporary fixtures, network disabled:
 python3 tools/test_codex_container.py
 python3 tools/test_codex_stack_container.py

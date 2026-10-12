@@ -14,6 +14,10 @@ seat card by design.
   jail**: all of the host's `~/Projects` mounted at `/workspace`) and `stack` (the
   **per-stack jails**: scoped mounts, per-stack tokens, SA-scoped kubectl; launcher
   `tools/stack-jail.sh`, in-container init `tools/stack-jail-init.sh`).
+- The `browser` compose service: the **browser sidecar** — one headless Chromium +
+  Playwright MCP container per host, on the external `jail-browser` network, which every
+  jail's entrypoint registers as the `browser` MCP server (`tools/mcp-register.py`); host
+  verbs in `tools/jail-browser.sh`. Nothing browser-related is baked into the jail image.
 - `.aliases`: host-side launch shortcuts, one per session type. Each publishes its own
   upload port; only `main` maps the OAuth callback port 54545, so log in there once —
   every other session shares the token via the `.credentials.json` single-file mount.
