@@ -38,19 +38,27 @@ GITCFG
 # actually exist on the host. Read-only mounts for configs; RW for history
 # and frameworks (so plugin installs/updates persist).
 OVERRIDE="$DIR/docker-compose.override.yml"
-{
-  echo "services:"
-  echo "  claude:"
+# Both services get the shell setup; the stack jails' history is per stack and mounted by
+# tools/stack-jail.sh, so only `claude` gets the shared one. Paths are written as ${HOME}
+# (expanded by compose) so the tracked file stays the same on every host.
+shell_service() {
+  echo "  $1:"
   echo "    environment:"
   echo "      TZ: ${TZ:-Europe/Tallinn}"
   echo "      TERM: xterm-256color"
   echo "      COLORTERM: truecolor"
   echo "    volumes:"
-  [ -f "$HOME/.zshrc" ]      && echo "      - $HOME/.zshrc:/home/node/.zshrc:ro"
-  [ -d "$HOME/.oh-my-zsh" ]  && echo "      - $HOME/.oh-my-zsh:/home/node/.oh-my-zsh"
-  [ -d "$HOME/.config/zsh" ] && echo "      - $HOME/.config/zsh:/home/node/.config/zsh"
-  [ -f "$HOME/.p10k.zsh" ]   && echo "      - $HOME/.p10k.zsh:/home/node/.p10k.zsh:ro"
-  echo "      - $ZSH_HIST:/home/node/.zsh_history"
+  [ -f "$HOME/.zshrc" ]      && echo '      - ${HOME}/.zshrc:/home/node/.zshrc:ro'
+  [ -d "$HOME/.oh-my-zsh" ]  && echo '      - ${HOME}/.oh-my-zsh:/home/node/.oh-my-zsh'
+  [ -d "$HOME/.config/zsh" ] && echo '      - ${HOME}/.config/zsh:/home/node/.config/zsh'
+  [ -f "$HOME/.p10k.zsh" ]   && echo '      - ${HOME}/.p10k.zsh:/home/node/.p10k.zsh:ro'
+  return 0
+}
+{
+  echo "services:"
+  shell_service claude
+  echo '      - ${HOME}/Projects/.claude-data.zsh_history:/home/node/.zsh_history'
+  shell_service stack
 } > "$OVERRIDE"
 
 echo ".env + docker-compose.override.yml written (UID=$(id -u), GID=$(id -g))."
