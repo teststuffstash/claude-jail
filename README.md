@@ -56,9 +56,8 @@ source .aliases
 
 `setup-env.sh` writes HOST_UID/HOST_GID into `.env`, creates missing Claude JSON,
 shell-history and jail Git-identity files, and **rewrites**
-`docker-compose.override.yml` for the host's available zsh dotfiles. Its generator
-currently writes only the `claude` service, even if your previous override also
-contained a `stack` entry.
+`docker-compose.override.yml` for the host's available zsh dotfiles (`claude` and
+`stack` services, `${HOME}`-relative, so a re-run leaves the tracked file unchanged).
 
 The Claude services expect `.claude-data/.credentials.json` to exist as a **file**
 for their shared login mount. The setup script does not create it; check this when
