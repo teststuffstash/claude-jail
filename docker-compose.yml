@@ -27,7 +27,11 @@ services:
       # the `browser` MCP server in ~/.claude.json. Empty = no registration.
       JAIL_BROWSER_MCP_URL: http://jail-browser:8931/mcp
     networks: [default, browser]
-    depends_on: [browser]   # `docker compose run` starts dependencies — the aliases need no change
+    # `docker compose run` starts dependencies, so the aliases need no change. required: false
+    # (compose >= 2.20): a sidecar that cannot start (offline first pull) costs the session its
+    # browser, not the session itself.
+    depends_on:
+      browser: {condition: service_started, required: false}
     volumes:
       - ${HOME}/Projects:/workspace
       - ${HOME}/Projects/.claude-data:/home/node/.claude
@@ -83,7 +87,8 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: service.name=claude-code,role=jail,stack=jail,jail.name=${JAIL_NAME:-stack}
       JAIL_BROWSER_MCP_URL: http://jail-browser:8931/mcp
     networks: [default, browser]
-    depends_on: [browser]
+    depends_on:
+      browser: {condition: service_started, required: false}
     volumes:
       # tools/ read-only: the upload server + stack-jail-init.sh live here
       - ${HOME}/Projects/tools:/workspace/tools:ro
