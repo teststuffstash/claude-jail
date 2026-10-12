@@ -82,8 +82,9 @@ ARG CODEX_VERSION=0.155.1
 RUN npm install -g @openai/codex@${CODEX_VERSION}
 COPY tools/codex-entrypoint.sh /usr/local/bin/codex-entrypoint.sh
 COPY tools/codex-context.py /opt/jail/codex-context.py
+COPY tools/codex-transcripts-sync.sh /opt/jail/codex-transcripts-sync.sh
 COPY tools/upload/upload.py /opt/jail/upload.py
-RUN chmod 0755 /usr/local/bin/codex-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/codex-entrypoint.sh /opt/jail/codex-transcripts-sync.sh
 USER node
 ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/codex-entrypoint.sh"]
 CMD ["codex"]

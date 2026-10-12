@@ -297,11 +297,36 @@ and downstream services are separate runtime setup. Native Codex OTLP must be
 configured in its own `config.toml`; see [official telemetry configuration](https://learn.chatgpt.com/docs/config-file/config-advanced).
 A collector configuration alone does not establish successful delivery.
 
-Codex transcript upload to Garage, collector receipt, usage/accounting dashboards,
-monitor events and Claude transcript consumers still need runtime integration and
-verification. The tracked jail source has no transcript uploader to reuse directly.
-Current build evidence and the inside-jail checklist live in
-[CODEX-JAIL-HANDOFF.md](CODEX-JAIL-HANDOFF.md).
+The `homelab-codex` launcher supplies native Codex's OTLP/HTTP log and metrics
+exporters with the LAN collector at `http://192.168.40.29:4318`, tags the OTel
+environment with the jail name, and leaves raw prompt export disabled. Generic
+Codex project jails remain disconnected unless `CODEX_OTLP_BASE_ENDPOINT` is set.
+Log receipt was verified in Loki on 2026-09-21, including redacted prompt content
+and response token fields. Native metrics did not appear at the collector's
+Prometheus exporter, so metrics delivery and dashboard reconciliation remain open.
+
+The homelab Codex seat synchronizes native transcripts at startup (catch-up) and
+normal wind-down. It can also be invoked explicitly during a long session:
+
+```bash
+bash /workspace/tools/codex-transcripts-sync.sh
+```
+
+The adapter uploads only `$CODEX_HOME/sessions/**/*.jsonl` to
+`jail-transcripts/codex/<jail-name>/sessions/…`, preserving Codex's date partitions.
+It obtains the existing bucket writer credential at run time from the homelab cluster
+unless AWS credentials are already supplied. Like the Claude adapter, failures are
+loud but best-effort so loss of Garage cannot prevent jail repair work. Automatic
+scheduling is intentionally limited to the homelab seat; other mono projects and
+scoped stack jails are not silently added to the sensitive archive. Real Garage
+receipt/readback was verified from the homelab Codex jail on 2026-09-21. Never upload
+`CODEX_HOME` wholesale: it holds `auth.json`.
+
+Still open for Codex: native metrics delivery (above) and dashboard/usage
+reconciliation; Claude-specific consumers — skill/tool hooks, transcript retrospective
+readers, monitor/meta-event signals — have not been audited for Codex equivalents.
+Implement only what standalone jail operation needs; platform coordination stays in
+homelab.
 
 The existing attended cross-jail file-drop protocol is described in
 [tools/handoff.md](tools/handoff.md). Claude's `/handoff` and `/loop` commands are not
@@ -319,6 +344,7 @@ rewrites the generated override; review local customizations first.
 python3 tools/test_codex_jail.py
 python3 tools/test_codex_context.py
 python3 tools/test_codex_stack.py
+python3 tools/test_codex_transcripts.py
 # After building the codex-jail-codex image; temporary fixtures, network disabled:
 python3 tools/test_codex_container.py
 python3 tools/test_codex_stack_container.py
@@ -326,5 +352,9 @@ python3 tools/test_codex_stack_container.py
 
 The host build was validated with Codex 0.155.1 and Claude 2.1.278. These checks
 cover launcher contracts, startup context, mock Git credentials, skills links,
-persistence, uploads and shutdown. Real login/resume and service integrations
-remain the inside-jail acceptance work; they are not implied by the offline tests.
+persistence, uploads and shutdown; they do not imply live behavior. Inside-jail
+acceptance was observed on 2026-09-21: ChatGPT auth, a real `codex exec`, native
+transcript creation, cwd/sibling visibility, instructions, skills link, homelab Devbox
+tools, Git identity and GitHub auth, and resuming the same session ID in a container
+from a rebuilt image. The homelab seat's generated `AGENTS.md` (homelab `CLAUDE.md` +
+seat card) was ~28 KB then; watch instruction-size limits as those sources grow.

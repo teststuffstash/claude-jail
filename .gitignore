@@ -50,3 +50,6 @@ __pycache__/
 
 # Native Codex jail state (auth, sessions, config)
 /.codex-jail/
+
+# Local working notes (Codex jail build handoff; durable facts live in README)
+/CODEX-JAIL-HANDOFF.md

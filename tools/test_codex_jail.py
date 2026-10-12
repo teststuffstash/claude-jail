@@ -20,7 +20,7 @@ class LauncherTest(unittest.TestCase):
         self.bin = self.root / 'bin'
         self.bin.mkdir()
         docker = self.bin / 'docker'
-        docker.write_text('#!/usr/bin/env python3\nimport json,sys,os\nfrom pathlib import Path\nPath(os.environ["CAPTURE"]).write_text(json.dumps({k:v for k,v in os.environ.items() if k.startswith("JAIL_")}))\nprint(json.dumps(sys.argv[1:]))\n')
+        docker.write_text('#!/usr/bin/env python3\nimport json,sys,os\nfrom pathlib import Path\nPath(os.environ["CAPTURE"]).write_text(json.dumps({k:v for k,v in os.environ.items() if k.startswith("JAIL_") or k == "CODEX_OTLP_BASE_ENDPOINT"}))\nprint(json.dumps(sys.argv[1:]))\n')
         docker.chmod(0o755)
         self.env = dict(os.environ, CAPTURE=str(self.root / 'captured.json'), PATH=f'{self.bin}:{os.environ["PATH"]}')
 
@@ -66,6 +66,7 @@ class LauncherTest(unittest.TestCase):
         self.assertEqual(env['JAIL_MOUNT_SOURCE'], str(self.root))
         self.assertEqual(env['JAIL_MOUNT_TARGET'], '/workspace')
         self.assertEqual(env['JAIL_HOMELAB_SEAT'], '1')
+        self.assertEqual(env['CODEX_OTLP_BASE_ENDPOINT'], 'http://192.168.40.29:4318')
         self.assertIn(f'{self.root}/.claude-data/homelab-keepass:/home/node/.claude/homelab-keepass:ro', args)
         self.assertIn(f'{self.root}/.codex-jail/main/service-credentials:/home/node/.claude', args)
         (self.root / '.claude-data/homelab-keepass/homelab.keyx').unlink()

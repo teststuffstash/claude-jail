@@ -11,6 +11,8 @@ services:
     working_dir: ${JAIL_WORKDIR:?Use tools/codex-jail.sh}
     environment:
       JAIL_HOMELAB_SEAT: ${JAIL_HOMELAB_SEAT:-0}
+      JAIL_NAME: ${JAIL_NAME:?Use tools/codex-jail.sh}
+      CODEX_OTLP_BASE_ENDPOINT: ${CODEX_OTLP_BASE_ENDPOINT:-}
       CODEX_HOME: /home/node/.codex
       UPLOAD_DIR: ${JAIL_WORKDIR:?Use tools/codex-jail.sh}/uploads
       TERM: ${TERM:-xterm-256color}

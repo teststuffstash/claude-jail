@@ -59,6 +59,13 @@ fi
 export JAIL_HOMELAB_SEAT=0
 [[ $mono == 1 && $JAIL_PROJECT == "$ROOT/homelab" ]] && JAIL_HOMELAB_SEAT=1
 export JAIL_STATE="$ROOT/.codex-jail/$name"
+export JAIL_NAME="$name"
+# The homelab seat has a provisioned LAN OTLP ingress. Keep generic project
+# jails disconnected unless their launcher explicitly supplies an endpoint.
+export CODEX_OTLP_BASE_ENDPOINT="${CODEX_OTLP_BASE_ENDPOINT:-}"
+if [[ $JAIL_HOMELAB_SEAT == 1 && -z $CODEX_OTLP_BASE_ENDPOINT ]]; then
+  CODEX_OTLP_BASE_ENDPOINT=http://192.168.40.29:4318
+fi
 export JAIL_UID="$(id -u)" JAIL_GID="$(id -g)"
 if [[ -n $env_file ]]; then
   [[ -f $env_file ]] || { echo 'Runtime env file does not exist' >&2; exit 2; }
