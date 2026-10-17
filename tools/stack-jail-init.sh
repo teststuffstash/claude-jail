@@ -117,11 +117,20 @@ EOF
 else
   _sj_kube="no kube token was injected this session — kubectl is unavailable."
 fi
+if [ -n "${STACK_JAIL_SECOND:-}" ]; then
+  _sj_second=$(cat <<'EOF'
+> **SECONDARY session (`<stack> --second`) — you are NOT the primary seat.** Another jail of this stack is running on the SAME host checkouts under `/workspace/<repo>`. Follow homelab's second-jail skill, `/workspace/homelab/.claude/skills/second-jail/SKILL.md`, with the stack repos in place of `/workspace/homelab`: work only in a clone under your scratchpad, PR lane only, write no shared record (trackers, memory, handoff), remove the clone when done.
+EOF
+)
+  _sj_second="$_sj_second
+"                                   # $(…) strips the blank line that must end the blockquote
+fi
 {
   cat <<EOF
 # ${STACK_NAME:-stack} stack jail — session card
 <!-- rendered at session start by tools/stack-jail-init.sh from the STACK_* env — edit the renderer (or tools/jail-card.md below), not this file -->
 
+${_sj_second:-}
 - **Stack: ${STACK_NAME:-?}.** Only this stack's repos are mounted under \`/workspace\`, plus any read-only extras (private repos, or another stack's repos mounted as prior art — read them before redoing what they already solved; changes there go through that stack's jail) — \`ls /workspace\` shows the full set.
 - **git/gh**: the stack's fine-grained PAT (owner identity) covers ONLY: ${STACK_REPOS:-<none>}. Direct push to master works there (the owner bypasses rulesets). \`gh\` is authenticated via \`GH_TOKEN\`. Known limit: fine-grained PATs have no Checks permission — \`gh pr checks\` 403s; use \`gh run watch\` + the PR's \`mergeStateStatus\` instead.
 - **homelab**: shallow clone at \`/workspace/homelab\`, never the host checkout (it holds gitignored secrets). Its facts-only \`CLAUDE.md\` is your homelab context — this jail gets no homelab seat card by design. ${_sj_hl}
@@ -138,7 +147,7 @@ EOF
     echo "(tools/jail-card.md was missing at composition time — container ground rules absent)"
   fi
 } > /workspace/CLAUDE.local.md
-unset _sj_hl _sj_kube
+unset _sj_hl _sj_kube _sj_second
 
 unset STACK_PAT STACK_HOMELAB_TOKEN STACK_KUBE_TOKEN STACK_KUBE_SERVER STACK_KUBE_CA
 unset -f _sj_warn _sj_cred 2>/dev/null

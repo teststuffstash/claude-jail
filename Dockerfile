@@ -81,7 +81,7 @@ CMD ["claude"]
 # Codex reuses the jail toolchain, with its own entrypoint and persistent state.
 FROM jail-base AS codex
 USER root
-ARG CODEX_VERSION=0.155.1
+ARG CODEX_VERSION=latest
 RUN npm install -g @openai/codex@${CODEX_VERSION}
 COPY tools/codex-entrypoint.sh /usr/local/bin/codex-entrypoint.sh
 COPY tools/codex-context.py /opt/jail/codex-context.py

@@ -37,7 +37,7 @@ project's Devbox configuration for project tools.
 The host supplies Docker with Compose, the Projects checkout, and the shared
 `/nix` store. Codex's runtime env-file option requires Compose support for
 `docker compose run --env-from-file`. The image includes Claude Code, git, gh,
-tea, Python, zsh, sudo, and Devbox; the Codex target adds Codex **0.155.1**.
+tea, Python, zsh, sudo, and Devbox; the Codex target adds Codex from npm's **latest** tag.
 `.dockerignore` excludes sibling repositories and secrets from the image context.
 
 Docker is the jail boundary. Mono sessions can read/write all mounted Projects
@@ -86,7 +86,15 @@ homelab       # working directory /workspace/homelab; all Projects visible
 car-fleet
 oracle        # scoped stack jail
 oracle --login
+oracle --second   # a second oracle jail beside the running one (homelab's second-jail rules)
 ```
+
+`<stack> --second` launches a separate container for the same stack: its own credential
+mints and OTLP identity `<stack>-stack-2`, sharing `.claude-data-<stack>/`. It publishes no
+port (no upload UI, no `--login`), so any number of them can run at once.
+The stack repos are the same host checkouts the primary works in, so its session card carries
+homelab's `second-jail` skill (`.claude/skills/second-jail/SKILL.md`): work in a clone, PR lane
+only, no shared records.
 
 The default/final Docker target remains Claude. [docker-compose.yml](docker-compose.yml)
 defines the `claude` mono service and the generic `stack` service. Use
@@ -197,7 +205,8 @@ tools/codex-jail.sh --project /path/to/repo --name my-repo
 
 [docker-compose.codex.yml](docker-compose.codex.yml) is standalone. Config is seeded once with ChatGPT-only login
 and file credential storage. Model selection retains the CLI default. Set
-`CODEX_VERSION` when building to deliberately override the pinned CLI version.
+`CODEX_VERSION` when building to override the default `latest` tag with a specific version.
+Docker may reuse the cached npm install layer; use a no-cache build to refresh it on later rebuilds.
 
 ## Persistent state and credentials
 

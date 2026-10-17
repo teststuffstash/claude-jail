@@ -2,6 +2,7 @@
 # stack-jail — host-side launcher for a per-stack jail (the credential airlock).
 #
 #   stack-jail.sh <stack> [--codex] [--build | --login] [-- CODEX_ARGS...]
+#   stack-jail.sh <stack> --second    a SECONDARY Claude jail beside the running one (homelab's second-jail skill)
 #
 # Per-stack jails supersede launching everything through the mono claude-jail.
 # Middle-ground permission model (decided 2026-07-12):
@@ -38,16 +39,21 @@ STACK="${1:-}"; shift || true
 LOGIN=0
 RUNTIME=claude
 BUILD=0
+SECOND=0
 ARGS=()
 while (($#)); do
   case "$1" in
     --codex) RUNTIME=codex; shift;;
     --login) LOGIN=1; shift;;
     --build) BUILD=1; shift;;
+    --second) SECOND=1; shift;;
     --) shift; ARGS=("$@"); break;;
     *) echo "Unknown option: $1" >&2; exit 2;;
   esac
 done
+if [[ $SECOND == 1 && ( $RUNTIME == codex || $LOGIN == 1 || $BUILD == 1 ) ]]; then
+  echo '--second takes no other option (Claude only)' >&2; exit 2
+fi
 if [[ $RUNTIME == claude && ${#ARGS[@]} != 0 ]]; then
   echo 'Extra CLI arguments currently require --codex' >&2; exit 2
 fi
@@ -204,6 +210,13 @@ set +a
 pat_var="${PREFIX}_PAT"; hl_var="${PREFIX}_HOMELAB_TOKEN"
 export STACK_NAME="$STACK"
 export JAIL_NAME="${STACK}-stack"   # per-jail OTLP identity (homelab#566) — compose maps it into OTEL_RESOURCE_ATTRIBUTES
+# --second: a full second container beside the running one — own mints, own ephemeral /workspace,
+# shared .claude-data-<stack>/. The stack repos are the SAME host checkouts, so the session runs
+# under homelab's second-jail skill (clone-only, PR lane), which stack-jail-init.sh puts on its card.
+export STACK_JAIL_SECOND=""
+if [[ $SECOND == 1 ]]; then
+  JAIL_NAME="${STACK}-stack-2"; STACK_JAIL_SECOND=1
+fi
 export STACK_PAT="${!pat_var:-}"
 export STACK_HOMELAB_TOKEN="${!hl_var:-}"
 export STACK_REPOS="$REPOS"
@@ -317,11 +330,12 @@ if [[ $RUNTIME == codex ]]; then
 fi
 
 PORTS=(-p "$UPLOAD_PORT:8000")
+[[ $SECOND == 1 ]] && PORTS=()      # no published port, so any number of --second jails can run
 [ "$LOGIN" = 1 ] && PORTS+=(-p 54545:54545)
 
 exec docker compose -f "$PROJECTS/docker-compose.yml" run --rm \
   "${PORTS[@]}" "${VOLS[@]}" \
-  -e UPLOAD_DIR -e JAIL_NAME -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
+  -e UPLOAD_DIR -e JAIL_NAME -e STACK_JAIL_SECOND -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
   -e STACK_KUBE_TOKEN -e STACK_KUBE_SERVER -e STACK_KUBE_CA -e STACK_KUBE_NS \
   stack \
   zsh -c "source /workspace/tools/stack-jail-init.sh && cd $MAIN_DIR && exec claude --dangerously-skip-permissions"
