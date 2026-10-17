@@ -231,6 +231,15 @@ inside wallet-enabled Codex sessions persist in the separate cache directory abo
 Never commit runtime state or export the entire Codex home as a transcript archive:
 it contains authentication data.
 
+Forgejo git (mono Claude jail only): when homelab's `wallet-files.sh` has written
+`.claude-data/homelab-forgejo/`, the entrypoint writes a container-local `~/.ssh/config`
+entry for `forgejo.teststuff.net` (that key, host key pinned in
+[tools/forgejo_known_hosts](tools/forgejo_known_hosts)), imports the GPG key, and signs
+commits and tags in any repository with a Forgejo remote via `includeIf hasconfig` in a
+container-local `GIT_CONFIG_GLOBAL` that includes the mounted `~/.gitconfig`. GitHub
+repositories stay unsigned. Stack jails get none of this: the key reaches every personal
+Forgejo repository, so a stack needing one gets a per-repository deploy key.
+
 Claude jails persist zsh history (mono: `.claude-data.zsh_history`; stack:
 `.claude-data-<stack>.zsh_history`) but mount no host shell dotfiles (plain zsh, no `.zshrc`).
 Codex does not currently persist zsh history.
@@ -273,6 +282,7 @@ belong in a commit. Logs are at `/tmp/upload-server.log`. See
 | `sleep-tracking` | 8005 | — |
 | `snore-recorder` | 8006 | — |
 | `teststuff` | 8007 | — |
+| `games` | 8008 | — |
 | `homelab-go` | 8012 | — |
 | `sleep-tracking-or` | 8015 | — |
 | `openrouter-operator` | 8016 | — |
