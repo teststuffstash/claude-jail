@@ -43,6 +43,44 @@ if [ -z "${STACK_NAME:-}" ]; then
   if [ -d /workspace/homelab/githooks ]; then
     git -C /workspace/homelab config core.hooksPath githooks || true
   fi
+
+  # Forgejo git identity — MONO jail only, and only when homelab's wallet-files.sh has
+  # materialized the key cache into this jail's ~/.claude (homelab CLAUDE.md §Secrets). That
+  # key reaches every personal Forgejo repo, so stack jails never get it (their ~/.claude
+  # has no cache by design); a stack needing one repo gets a per-repo deploy key instead.
+  # Before this, each checkout carried its own hand-set core.sshCommand (or none) and no
+  # jail had the GPG key imported, so pushes and signing broke per clone.
+  #   ssh: one Host block, the cached key, the host key pinned in tools/forgejo_known_hosts.
+  #   gpg: the cached key imported into the container-local keyring; commits/tags to a
+  #        Forgejo remote are signed (includeIf hasconfig — GitHub repos are untouched).
+  # ~/.gitconfig is a busy bind-mount (EBUSY on rewrite, see the credential block below), so
+  # the include lives in a container-local GIT_CONFIG_GLOBAL that includes the mounted file.
+  FJ=/home/node/.claude/homelab-forgejo
+  if [ -f "$FJ/id_ed25519" ]; then
+    mkdir -p /home/node/.ssh && chmod 700 /home/node/.ssh
+    ( umask 077; cat > /home/node/.ssh/config <<EOF
+Host forgejo.teststuff.net
+  User git
+  IdentityFile $FJ/id_ed25519
+  IdentitiesOnly yes
+  UserKnownHostsFile /workspace/tools/forgejo_known_hosts
+  StrictHostKeyChecking yes
+EOF
+    )
+  fi
+  if [ -f "$FJ/gpg-private.asc" ] && gpg --batch --quiet --import "$FJ/gpg-private.asc" 2>/dev/null; then
+    FJ_KEY=$(gpg --batch --with-colons --list-secret-keys 2>/dev/null | awk -F: '$1 == "sec" { print $5; exit }')
+    printf '[user]\n\tsigningkey = %s\n[commit]\n\tgpgsign = true\n[tag]\n\tgpgsign = true\n' "$FJ_KEY" \
+      > /home/node/.gitconfig-forgejo-signing
+    { printf '[include]\n\tpath = /home/node/.gitconfig\n'
+      for url in 'ssh://git@forgejo.teststuff.net/**' 'git@forgejo.teststuff.net:*/**' 'https://forgejo.teststuff.net/**'; do
+        printf '[includeIf "hasconfig:remote.*.url:%s"]\n\tpath = /home/node/.gitconfig-forgejo-signing\n' "$url"
+      done
+    } > /home/node/.gitconfig-jail
+    export GIT_CONFIG_GLOBAL=/home/node/.gitconfig-jail
+  elif [ -f "$FJ/gpg-private.asc" ]; then
+    echo "jail-entrypoint: Forgejo GPG key import failed — Forgejo commits will be UNSIGNED" >&2
+  fi
 fi
 
 # Browser MCP server (claude-jail#5): the compose service `browser` (a headless Chromium +
