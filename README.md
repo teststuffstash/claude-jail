@@ -37,7 +37,7 @@ project's Devbox configuration for project tools.
 The host supplies Docker with Compose, the Projects checkout, and the shared
 `/nix` store. Codex's runtime env-file option requires Compose support for
 `docker compose run --env-from-file`. The image includes Claude Code, git, gh,
-tea, Python, zsh, sudo, and Devbox; the Codex target adds Codex **0.155.1**.
+tea, Python, zsh, sudo, and Devbox; the Codex target adds Codex from npm's **latest** tag.
 `.dockerignore` excludes sibling repositories and secrets from the image context.
 
 Docker is the jail boundary. Mono sessions can read/write all mounted Projects
@@ -205,7 +205,8 @@ tools/codex-jail.sh --project /path/to/repo --name my-repo
 
 [docker-compose.codex.yml](docker-compose.codex.yml) is standalone. Config is seeded once with ChatGPT-only login
 and file credential storage. Model selection retains the CLI default. Set
-`CODEX_VERSION` when building to deliberately override the pinned CLI version.
+`CODEX_VERSION` when building to override the default `latest` tag with a specific version.
+Docker may reuse the cached npm install layer; use a no-cache build to refresh it on later rebuilds.
 
 ## Persistent state and credentials
 
