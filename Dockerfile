@@ -27,7 +27,20 @@ RUN curl -fsSL "https://dl.gitea.com/tea/${TEA_VERSION}/tea-${TEA_VERSION}-linux
     echo "${TEA_SHA256}  /usr/local/bin/tea" | sha256sum -c - && \
     chmod 0755 /usr/local/bin/tea
 
-RUN npm install -g @anthropic-ai/claude-code
+# Claude Code CLI — pinned to homelab's version-set STAMP (homelab#2014 shape (a)): the one
+# version the worker (agent-base) and the coordinator/reviewer images bake too, so the three
+# claude images agree and the drift belt (`VersionSetMembersDisagree` / `VersionSetBehindPin`,
+# homelab argocd/resources/version-sets/) stays quiet. The stamp is read at BUILD time (the ADD
+# fetches master's lock; Docker re-checks it on every build), so a host rebuild IS the seat's
+# deploy edge — the belt only watches it. Never npm latest: that is how the seat ran 2.1.301
+# against a 2.1.293 stamp. Override for a one-off: --build-arg CLAUDE_CODE_VERSION=<x.y.z>.
+ARG CLAUDE_CODE_VERSION=""
+ADD https://raw.githubusercontent.com/teststuffstash/homelab/master/version-sets/devbox.lock /opt/version-sets.lock
+RUN CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-$(jq -er '.packages | to_entries[] | select(.key | startswith("claude-code@")) | .value.version' /opt/version-sets.lock)}" && \
+    test -n "$CLAUDE_CODE_VERSION" && \
+    echo "version set: claude-code ${CLAUDE_CODE_VERSION}" && \
+    npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" && \
+    claude --version | grep -qF "$CLAUDE_CODE_VERSION"
 
 # Remap the existing 'node' user/group to match the host UID/GID so files
 # created in mounted volumes are owned by the host user. Also switch the
