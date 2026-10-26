@@ -6,6 +6,12 @@ the issue → coordinator path (or human copy-paste) would kill the feedback loo
 tracker: anything worth remembering past the rollout day still becomes a GitHub issue / follow-up,
 and the mono session doing the work owns documenting it in the right home.
 
+**Status (operator, 2026-10-26): a stopgap, kept honest.** The channel had one mission — a stack
+files homelab-side work — and is now also used for the shapes below, so every assumption about it
+is suspect. The direction is stack↔platform communication that needs no live seat (the
+`platform-request` label on the stack repo is the shape); handoff + issues/PRs is good enough
+until then. A useful antipattern: extend the protocol here, never grow machinery around it.
+
 ## Topology
 
 Host `~/Projects/.handoff/<stack>/{inbox,doing,done}` (gitignored runtime data).
@@ -46,6 +52,18 @@ if it needs more input), then `mv` to `done/`. Run it in a loop during rollout d
 **Reading the answer (stack session):** watch `done/` — `ls /workspace/.handoff/done/`. A result
 that is a counter-question is answered by filing a fresh inbox task (files in `done/` are never
 edited again; the filename ordering keeps the thread readable).
+
+**Outbound notices (mono → stack):** a mono session that has something for a stack — a SHIPPED
+notice for work the stack is waiting on, an answer nobody asked for yet, a heads-up — writes it
+straight into that stack's `done/` as `<stamp>-<slug>.md` with the same header and a `## Result`
+body (there is nothing to claim, so `inbox/`/`doing/` are skipped). The stack reads `done/` as
+before; a reply is a fresh inbox task. (Improvised the same way three times in Oct 2026, GAPS
+handoff-G4 — now the documented shape.)
+
+**Durable records from a SECOND jail:** a secondary homelab session (`/second-jail`) may work and
+answer handoff tasks but owns no shared record (tracker, meta-state, TICK-LOG). It writes the
+`## Result`, moves the file to `done/`, and hands the durable record — the FU/issue the task
+deserves — to the primary seat in its final message instead of filing it.
 
 ## Boundaries
 
