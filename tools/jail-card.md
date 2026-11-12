@@ -16,8 +16,9 @@ installing packages.
 
 ## Environment
 
-- Container base: `node:22-bookworm` (Debian, running as `node` user remapped to host
-  UID/GID)
+- Container base: `debian:trixie`, running as the `node` user (host UID/GID). There is
+  **no Node runtime in the image** — Claude Code is a native binary; a project that needs
+  `node`/`npm`/`npx` declares `nodejs` in its `devbox.json`
 - The `node` user has **passwordless sudo** — install packages directly with
   `sudo apt-get install ...` (installs are ephemeral; add to claude-jail's `Dockerfile`
   to persist them)

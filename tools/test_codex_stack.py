@@ -51,7 +51,7 @@ class StackTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         args = json.loads(result.stdout.splitlines()[-1])
         self.assertEqual(args[-3:], ["codex", "login", "--device-auth"])
-        self.assertNotIn("54545:54545", args)
+        self.assertNotIn("127.0.0.1:54545:54545", args)
 
     def test_claude_still_uses_original_launch(self):
         (self.root / ".claude-data").mkdir()
@@ -59,8 +59,8 @@ class StackTest(unittest.TestCase):
         result = self.run_stack("--login")
         self.assertEqual(result.returncode, 0, result.stderr)
         args = json.loads(result.stdout.splitlines()[-1])
-        self.assertIn("8017:8000", args)
-        self.assertIn("54545:54545", args)
+        self.assertIn("127.0.0.1:8017:8000", args)
+        self.assertIn("127.0.0.1:54545:54545", args)
         self.assertIn("exec claude --dangerously-skip-permissions", args[-1])
 
     def test_build_does_not_provision(self):

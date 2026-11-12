@@ -22,9 +22,19 @@ seat card by design.
   upload port; only `main` maps the OAuth callback port 54545, so log in there once —
   every other session shares the token via the `.credentials.json` single-file mount.
 - `tools/`: the entrypoint, the stack launcher/init pair, the upload server, the
-  cross-jail handoff protocol (`tools/handoff.md`), and the jail card.
+  cross-jail handoff protocol (`tools/handoff.md`), and the jail card. The stack launcher's
+  host-side helpers: `stack-lock.sh` (one launch per stack), `secret-cmd.sh` (`<NAME>_CMD`
+  tokens from a wallet), `git_audit.py` (what a session left in `.git` that the host would
+  run), `pin-aliases.sh` (`jail-pin`: the host shell sources a reviewed copy of `.aliases`).
+- The image is `debian:trixie` with native Claude Code and Codex binaries and no Node runtime;
+  the user is still called `node` because `/home/node` is in every mount and launcher.
 - This directory doubles as the host's `~/Projects`: project repos are cloned
   side-by-side and gitignored here (see `.gitignore`'s cloned-projects block).
+- The **work variant** (`RasmusSoot/claude-jail-work`, forked from here at `98051c0`) is a
+  separate repo with its own Claude and its own rules. Changes move by **pull only**: each side
+  reads the other and takes what it likes; neither writes to the other. Its clone at
+  `claude-jail-work/` is a read-only reference; `tools/work-variant.sh` shows what is new there
+  since the commit recorded in `tools/work-variant.rev`.
 - Credential boundary (HARD RULE): no credential in any jail may reach beyond the
   `teststuffstash` org — fine-grained PATs with that resource owner, or App installation
   tokens.

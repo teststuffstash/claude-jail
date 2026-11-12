@@ -133,6 +133,7 @@ fi
 ${_sj_second:-}
 - **Stack: ${STACK_NAME:-?}.** Only this stack's repos are mounted under \`/workspace\`, plus any read-only extras (private repos, or another stack's repos mounted as prior art — read them before redoing what they already solved; changes there go through that stack's jail) — \`ls /workspace\` shows the full set.
 - **git/gh**: the stack's fine-grained PAT (owner identity) covers ONLY: ${STACK_REPOS:-<none>}. Direct push to master works there (the owner bypasses rulesets). \`gh\` is authenticated via \`GH_TOKEN\`. Known limit: fine-grained PATs have no Checks permission — \`gh pr checks\` 403s; use \`gh run watch\` + the PR's \`mergeStateStatus\` instead.
+- **git hooks**: each stack repo's \`.git/hooks\` is read-only here (a hook written in the jail would run on the host). Installing one (\`pre-commit install\`) is the human's, on the host. When the session ends the launcher reports what changed in \`.git/config\` beyond branch upstreams, so leave config alone unless the task needs it.
 - **homelab**: shallow clone at \`/workspace/homelab\`, never the host checkout (it holds gitignored secrets). Its facts-only \`CLAUDE.md\` is your homelab context — this jail gets no homelab seat card by design. ${_sj_hl}
 - **kubectl**: ${_sj_kube}
 - **uploads**: files dropped via the upload UI land in \`${UPLOAD_DIR:-/workspace/uploads}\` (a gitignored inbox) — move them out to commit them.

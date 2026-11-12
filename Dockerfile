@@ -1,4 +1,7 @@
-FROM node:22-bookworm AS jail-base
+# Plain Debian, no Node: Claude Code and Codex are native binaries, and project tooling (node
+# included) comes from each project's devbox.json. A session that needs a bare `node`/`npx`
+# adds it with devbox (or `sudo apt-get install nodejs` for the session).
+FROM debian:trixie AS jail-base
 # pipefail: several RUNs pipe a download into its consumer (`curl | bash`, `curl | dd`);
 # without it a failed download is masked by the consumer's exit 0 and the build "succeeds".
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -7,7 +10,8 @@ ARG HOST_UID=1000
 ARG HOST_GID=1000
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends zsh git jq curl gpg tini python3 sudo xz-utils ipmitool && \
+    apt-get install -y --no-install-recommends \
+      ca-certificates zsh git jq curl gpg tini python3 sudo xz-utils ipmitool procps && \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
     chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
@@ -27,25 +31,12 @@ RUN curl -fsSL "https://dl.gitea.com/tea/${TEA_VERSION}/tea-${TEA_VERSION}-linux
     echo "${TEA_SHA256}  /usr/local/bin/tea" | sha256sum -c - && \
     chmod 0755 /usr/local/bin/tea
 
-# Claude Code CLI — pinned to homelab's version-set STAMP (homelab#2014 shape (a)): the one
-# version the worker (agent-base) and the coordinator/reviewer images bake too, so the three
-# claude images agree and the drift belt (`VersionSetMembersDisagree` / `VersionSetBehindPin`,
-# homelab argocd/resources/version-sets/) stays quiet. The stamp is read at BUILD time (the ADD
-# fetches master's lock; Docker re-checks it on every build), so a host rebuild IS the seat's
-# deploy edge — the belt only watches it. Never npm latest: that is how the seat ran 2.1.301
-# against a 2.1.293 stamp. Override for a one-off: --build-arg CLAUDE_CODE_VERSION=<x.y.z>.
-ARG CLAUDE_CODE_VERSION=""
-ADD https://raw.githubusercontent.com/teststuffstash/homelab/master/version-sets/devbox.lock /opt/version-sets.lock
-RUN CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-$(jq -er '.packages | to_entries[] | select(.key | startswith("claude-code@")) | .value.version' /opt/version-sets.lock)}" && \
-    test -n "$CLAUDE_CODE_VERSION" && \
-    echo "version set: claude-code ${CLAUDE_CODE_VERSION}" && \
-    npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" && \
-    claude --version | grep -qF "$CLAUDE_CODE_VERSION"
-
-# Remap the existing 'node' user/group to match the host UID/GID so files
-# created in mounted volumes are owned by the host user. Also switch the
-# login shell to zsh.
-RUN usermod -u ${HOST_UID} -s /bin/zsh node && groupmod -g ${HOST_GID} node
+# The 'node' user, with the host UID/GID so files created in mounted volumes are owned by the
+# host user; login shell zsh. The NAME is history (the image used to be node:22, whose user
+# this was): /home/node is in every mount target, launcher and saved permission rule, so it
+# stays. A host GID Debian already uses (macOS staff = 20 = dialout) reuses that group.
+RUN (getent group "${HOST_GID}" >/dev/null || groupadd -g "${HOST_GID}" node) && \
+    useradd -l -u "${HOST_UID}" -g "${HOST_GID}" -m -s /bin/zsh node
 
 # Passwordless sudo for 'node' so software can be apt-installed mid-session.
 RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/node && \
@@ -83,6 +74,33 @@ ENV SHELL=/bin/zsh
 COPY tools/jail-entrypoint.sh /usr/local/bin/jail-entrypoint.sh
 RUN chmod +x /usr/local/bin/jail-entrypoint.sh
 
+# Claude Code, native build, pinned to homelab's version-set STAMP (homelab#2014 shape (a)): the
+# one version the worker (agent-base) and the coordinator/reviewer images bake too, so the three
+# claude images agree and the drift belt (`VersionSetMembersDisagree` / `VersionSetBehindPin`,
+# homelab argocd/resources/version-sets/) stays quiet. The stamp is read at BUILD time (the ADD
+# fetches master's lock; Docker re-checks it on every build), so a host rebuild IS the seat's
+# deploy edge — the belt only watches it. Never "latest": that is how the seat ran 2.1.301
+# against a 2.1.293 stamp. Override for a one-off: --build-arg CLAUDE_CODE_VERSION=<x.y.z>.
+# The installer takes the version, verifies the binary against that release's manifest and puts
+# it under ~/.local, which is not a mount, so it lives in the image; the in-container
+# auto-updater is off (it would move the seat off the stamp, into a container that loses it at
+# exit). The download cache under ~/.claude is dropped — that path is a bind mount at runtime.
+# The /usr/local/bin link keeps `claude` reachable from shells that reset PATH (login shells, sudo).
+ARG CLAUDE_CODE_VERSION=""
+ADD --chmod=644 https://raw.githubusercontent.com/teststuffstash/homelab/master/version-sets/devbox.lock /opt/version-sets.lock
+USER node
+RUN CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-$(jq -er '.packages | to_entries[] | select(.key | startswith("claude-code@")) | .value.version' /opt/version-sets.lock)}" && \
+    test -n "$CLAUDE_CODE_VERSION" && \
+    echo "version set: claude-code ${CLAUDE_CODE_VERSION}" && \
+    curl -fsSL -o /tmp/claude-install.sh https://claude.ai/install.sh && \
+    bash /tmp/claude-install.sh "$CLAUDE_CODE_VERSION" && \
+    rm -rf /tmp/claude-install.sh /home/node/.claude && \
+    /home/node/.local/bin/claude --version | grep -qF "$CLAUDE_CODE_VERSION"
+USER root
+RUN ln -s /home/node/.local/bin/claude /usr/local/bin/claude
+ENV PATH="/home/node/.local/bin:${PATH}" \
+    DISABLE_AUTOUPDATER=1
+
 USER node
 WORKDIR /workspace
 
@@ -94,8 +112,19 @@ CMD ["claude"]
 # Codex reuses the jail toolchain, with its own entrypoint and persistent state.
 FROM jail-base AS codex
 USER root
+# Codex, native build: the static musl binary from the GitHub release (the npm package only
+# wraps this same binary). CODEX_VERSION=latest follows the newest release at build time;
+# a version (0.167.2) pins it. ripgrep: the npm package vendored one for Codex's file search.
 ARG CODEX_VERSION=latest
-RUN npm install -g @openai/codex@${CODEX_VERSION}
+RUN apt-get update && apt-get install -y --no-install-recommends ripgrep && rm -rf /var/lib/apt/lists/* && \
+    arch="$(uname -m)" && asset="codex-${arch}-unknown-linux-musl" && \
+    if [ "${CODEX_VERSION}" = latest ]; then url="https://github.com/openai/codex/releases/latest/download/${asset}.tar.gz"; \
+    else url="https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/${asset}.tar.gz"; fi && \
+    curl -fsSL -o /tmp/codex.tar.gz "${url}" && \
+    tar -xzf /tmp/codex.tar.gz -C /tmp "${asset}" && \
+    install -m 0755 "/tmp/${asset}" /usr/local/bin/codex && \
+    rm -f /tmp/codex.tar.gz "/tmp/${asset}" && \
+    codex --version
 COPY tools/codex-entrypoint.sh /usr/local/bin/codex-entrypoint.sh
 COPY tools/codex-context.py /opt/jail/codex-context.py
 COPY tools/mcp-register.py /opt/jail/mcp-register.py
