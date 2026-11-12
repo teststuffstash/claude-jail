@@ -4,6 +4,12 @@
 #   stack-jail.sh <stack> [--codex] [--build | --login] [-- CODEX_ARGS...]
 #   stack-jail.sh <stack> --second    a SECONDARY Claude jail beside the running one (homelab's second-jail skill)
 #
+# One launch per stack and runtime at a time (tools/stack-lock.sh; --second takes no lock). The
+# stack's repos are the host's own checkouts, so each one's .git/hooks is mounted read-only and
+# tools/git_audit.py reports, when the session ends, what it left that host git or an IDE would
+# run (config keys, nested repos, a rebase in progress). A token in .env.<stack> may be a
+# <NAME>_CMD line that reads it from a wallet (tools/secret-cmd.sh).
+#
 # Per-stack jails supersede launching everything through the mono claude-jail.
 # Middle-ground permission model (decided 2026-07-12):
 #   - git: a per-stack fine-grained PAT with the OWNER's identity (resource owner
@@ -119,6 +125,28 @@ STATE_DIR="$PROJECTS/.claude-data-$STACK"
 [[ $RUNTIME == codex ]] && STATE_DIR="$PROJECTS/.codex-jail/stack-$STACK"
 CLAUDE_JSON="$PROJECTS/.claude-data-$STACK.json"
 PREFIX=$(printf '%s' "$STACK" | tr 'a-z-' 'A-Z_')
+TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # beside this script, wherever it is run from
+# shellcheck source=tools/stack-lock.sh
+. "$TOOLS_DIR/stack-lock.sh"
+# shellcheck source=tools/secret-cmd.sh
+. "$TOOLS_DIR/secret-cmd.sh"
+
+# Launcher state lives OUTSIDE ~/Projects: the mono jail mounts all of that read-write, and
+# neither the lock nor the git audit's snapshot may be something a session can rewrite.
+RUN_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/claude-jail/$STACK"
+mkdir -p "$RUN_DIR"; chmod 700 "$RUN_DIR"
+# One launch per stack and runtime: a second one would mint tokens and then die on the upload
+# port. (Codex next to Claude is fine, hence the runtime in the name.) Held until this script
+# exits; a lock whose holder is gone — a reboot, a closed terminal — is taken over with a
+# warning. --second is a deliberate second session: no lock.
+LOCK="$RUN_DIR/lock-$RUNTIME"
+if [[ $SECOND == 0 ]]; then
+  if ! _holder=$(lock_take "$LOCK"); then
+    echo "FATAL: $STACK ($RUNTIME) is already being launched or running (pid ${_holder%% *}, lock $LOCK). One at a time — or: $STACK --second" >&2
+    exit 2
+  fi
+  trap 'lock_release "$LOCK"' EXIT
+fi
 
 # Pre-create bind-mount targets so docker doesn't create them root-owned.
 # .claude.json must be VALID JSON — an empty file reads as "corrupted: Unexpected
@@ -195,6 +223,9 @@ ${PREFIX}_PAT=
 # pushes bypass the rulesets everywhere. Read access is not needed (homelab is
 # public; the clone is tokenless).
 ${PREFIX}_HOMELAB_TOKEN=
+# Either token may instead be a COMMAND that prints it, so the value lives in a wallet and
+# not in this file (set the value or the _CMD line, never both; tools/secret-cmd.sh):
+#   ${PREFIX}_PAT_CMD="secret-tool lookup service claude-jail stack $STACK"
 EOF
   chmod 600 "$ENV_FILE"
   echo "→ created $ENV_FILE — fill in the tokens, then re-run. Continuing without git credentials." >&2
@@ -202,12 +233,14 @@ fi
 
 # Normalize the per-stack env names to the generic STACK_* contract that
 # tools/stack-jail-init.sh consumes inside the jail.
+pat_var="${PREFIX}_PAT"; hl_var="${PREFIX}_HOMELAB_TOKEN"
+unset "${pat_var}_CMD" "${hl_var}_CMD"   # only the env file may name a command to run, never the calling shell
 set -a
 # per-stack .env.<stack>, chosen at run time
 # shellcheck source=/dev/null
 . "$ENV_FILE"
 set +a
-pat_var="${PREFIX}_PAT"; hl_var="${PREFIX}_HOMELAB_TOKEN"
+resolve_secret_cmds "$pat_var" "$hl_var" || exit 2   # <NAME>_CMD → <NAME>; a locked wallet stops the launch
 export STACK_NAME="$STACK"
 export JAIL_NAME="${STACK}-stack"   # per-jail OTLP identity (homelab#566) — compose maps it into OTEL_RESOURCE_ATTRIBUTES
 # --second: a full second container beside the running one — own mints, own ephemeral /workspace,
@@ -290,10 +323,25 @@ else
     -v "$PROJECTS/.claude-data-$STACK.zsh_history:/home/node/.zsh_history"
   )
 fi
+AUDIT_DIRS=()
 for m in $MOUNTS; do
   dir="${m%%:*}"; suffix=""
   [ "$m" != "$dir" ] && suffix=":${m#*:}"
   VOLS+=(-v "$PROJECTS/$dir:/workspace/$dir$suffix")
+  [ -z "$suffix" ] || continue                       # a read-only mount cannot be written: nothing to protect or audit
+  AUDIT_DIRS+=("$PROJECTS/$dir")
+  # .git/hooks read-only over the read-write checkout: a hook a session writes there would run
+  # on the HOST at the next commit, checkout or merge, and no diff would show it. Hooks are
+  # installed from the host (`pre-commit install` in the jail fails, on purpose). .git/config
+  # stays writable — sessions set upstreams all day — and the exit audit reads it instead.
+  g="$PROJECTS/$dir/.git"
+  if [ -d "$g" ] && [ ! -L "$g" ]; then
+    if [ -L "$g/hooks" ]; then
+      echo "FATAL: $g/hooks is a symlink — a mount there would be written through on the host. Inspect it before launching." >&2; exit 2
+    fi
+    mkdir -p "$g/hooks"                                # docker would create a missing source root-owned
+    VOLS+=(-v "$g/hooks:/workspace/$dir/.git/hooks:ro")
+  fi
 done
 # Secret files inside mounted host checkouts: shadow each with an empty read-only file.
 # Only existing ones — a missing target would make docker create it in the ro mount.
@@ -315,6 +363,36 @@ if [ -x "$PROJECTS/tools/jail-browser.sh" ]; then
   fi
 fi
 
+# Git audit (tools/git_audit.py): snapshot the read-write checkouts now, compare when the session
+# ends. A snapshot still lying there belongs to a session whose launcher never got to its audit
+# (a closed terminal, a reboot): that one is compared first, late but not lost.
+AUDIT_SNAP="$RUN_DIR/git-audit-$RUNTIME.json"
+[[ $SECOND == 0 ]] || AUDIT_SNAP="$RUN_DIR/git-audit-second-$$.json"
+git_audit() { # <when>
+  local hits
+  [ -f "$AUDIT_SNAP" ] || return 0
+  if ! hits=$(python3 "$TOOLS_DIR/git_audit.py" compare "$AUDIT_SNAP" ${AUDIT_DIRS[@]+"${AUDIT_DIRS[@]}"}); then
+    echo "⚠ git audit ($1) DID NOT RUN — what the session left in .git was not checked" >&2; return 0
+  fi
+  if [ -n "$hits" ]; then
+    echo "⚠ git audit ($1) — inspect these BEFORE running git or opening the repo in an IDE on the host:" >&2
+    printf '%s\n' "$hits" | sed 's/^/    /' >&2
+  fi
+  rm -f "$AUDIT_SNAP"
+}
+if [ ${#AUDIT_DIRS[@]} -gt 0 ]; then
+  git_audit "a previous session that ended without one"
+  python3 "$TOOLS_DIR/git_audit.py" snapshot "$AUDIT_SNAP" "${AUDIT_DIRS[@]}" \
+    || echo "⚠ git audit: no snapshot taken — this session will end without an audit" >&2
+fi
+# Not exec'd: the launcher outlives the session to run the audit and release the lock.
+run_session() { # <command…> → exits with the session's status
+  local rc=0
+  "$@" || rc=$?
+  git_audit "after session" || true
+  exit "$rc"
+}
+
 if [[ $RUNTIME == codex ]]; then
   JAIL_UID="$(id -u)" JAIL_GID="$(id -g)"
   export JAIL_UID JAIL_GID JAIL_ROOT="$PROJECTS"
@@ -322,18 +400,18 @@ if [[ $RUNTIME == codex ]]; then
   COMMAND=(codex --dangerously-bypass-approvals-and-sandbox "${ARGS[@]}")
   [[ $LOGIN == 0 ]] || COMMAND=(codex login --device-auth)
   # 8037..8040: a distinct port range from the Claude stacks and mono Codex.
-  exec docker compose --env-file /dev/null -p codex-jail -f "$PROJECTS/docker-compose.codex-stack.yml" run --rm \
+  run_session docker compose --env-file /dev/null -p codex-jail -f "$PROJECTS/docker-compose.codex-stack.yml" run --rm \
     -p "127.0.0.1:$((UPLOAD_PORT + 20)):8000" "${VOLS[@]}" \
     -e UPLOAD_DIR -e STACK_MAIN_DIR -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
     -e STACK_KUBE_TOKEN -e STACK_KUBE_SERVER -e STACK_KUBE_CA -e STACK_KUBE_NS \
     codex-stack "${COMMAND[@]}"
 fi
 
-PORTS=(-p "$UPLOAD_PORT:8000")
+PORTS=(-p "127.0.0.1:$UPLOAD_PORT:8000")   # loopback only: the upload server has no auth
 [[ $SECOND == 1 ]] && PORTS=()      # no published port, so any number of --second jails can run
-[ "$LOGIN" = 1 ] && PORTS+=(-p 54545:54545)
+[ "$LOGIN" = 1 ] && PORTS+=(-p 127.0.0.1:54545:54545)
 
-exec docker compose -f "$PROJECTS/docker-compose.yml" run --rm \
+run_session docker compose -f "$PROJECTS/docker-compose.yml" run --rm \
   "${PORTS[@]}" "${VOLS[@]}" \
   -e UPLOAD_DIR -e JAIL_NAME -e STACK_JAIL_SECOND -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
   -e STACK_KUBE_TOKEN -e STACK_KUBE_SERVER -e STACK_KUBE_CA -e STACK_KUBE_NS \

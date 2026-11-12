@@ -1,31 +1,33 @@
-# Each alias publishes its own ports with -p (host:container). The upload UI is
+# Each alias publishes its own ports with -p, on 127.0.0.1 only: the upload server has no
+# auth, so it must not be reachable from the LAN. The upload UI is
 # always container port 8000; the host port differs per session so they can run
 # at once. Only "main" (general/infra work from ~/Projects) maps the OAuth port
 # 54545, so it's the only session that can complete /login — Claude's callback
 # is hard-fixed to localhost:54545. Log in there once; the token persists in
 # .claude-data/ and every other session reuses it. UPLOAD_DIR is each project's
 # gitignored uploads/ inbox; move files out of there to commit them.
-alias main='JAIL_NAME=main UPLOAD_DIR=/workspace/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8000:8000 -p 54545:54545 claude'
-alias car-fleet='JAIL_NAME=car-fleet UPLOAD_DIR=/workspace/car-fleet/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8001:8000 claude zsh -c "cd /workspace/car-fleet && exec claude"'
-alias homelab='JAIL_NAME=homelab UPLOAD_DIR=/workspace/homelab/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8002:8000 claude zsh -c "cd /workspace/homelab && exec claude"'
-alias life='JAIL_NAME=life UPLOAD_DIR=/workspace/life/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8003:8000 claude zsh -c "cd /workspace/life && exec claude"'
-alias idp='JAIL_NAME=idp UPLOAD_DIR=/workspace/idp/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8004:8000 claude zsh -c "cd /workspace/idp && exec claude"'
-alias sleep-tracking='JAIL_NAME=sleep-tracking UPLOAD_DIR=/workspace/sleep-tracking/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8005:8000 claude zsh -c "cd /workspace/sleep-tracking && exec claude"'
+alias jail-pin='~/Projects/tools/pin-aliases.sh'   # review this file's diff, then pin it for the host shell
+alias main='JAIL_NAME=main UPLOAD_DIR=/workspace/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8000:8000 -p 127.0.0.1:54545:54545 claude'
+alias car-fleet='JAIL_NAME=car-fleet UPLOAD_DIR=/workspace/car-fleet/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8001:8000 claude zsh -c "cd /workspace/car-fleet && exec claude"'
+alias homelab='JAIL_NAME=homelab UPLOAD_DIR=/workspace/homelab/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8002:8000 claude zsh -c "cd /workspace/homelab && exec claude"'
+alias life='JAIL_NAME=life UPLOAD_DIR=/workspace/life/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8003:8000 claude zsh -c "cd /workspace/life && exec claude"'
+alias idp='JAIL_NAME=idp UPLOAD_DIR=/workspace/idp/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8004:8000 claude zsh -c "cd /workspace/idp && exec claude"'
+alias sleep-tracking='JAIL_NAME=sleep-tracking UPLOAD_DIR=/workspace/sleep-tracking/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8005:8000 claude zsh -c "cd /workspace/sleep-tracking && exec claude"'
 # Same project, routed through OpenRouter instead of Anthropic. Reuses the
 # sleep-tracking/claude-or wrapper (loads the key from sleep-tracking/.openrouter.env).
 # Distinct upload port (8015) so it can run alongside the native session.
-alias sleep-tracking-or='JAIL_NAME=sleep-tracking-or UPLOAD_DIR=/workspace/sleep-tracking/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8015:8000 claude zsh -c "cd /workspace/sleep-tracking && exec ./claude-or"'
+alias sleep-tracking-or='JAIL_NAME=sleep-tracking-or UPLOAD_DIR=/workspace/sleep-tracking/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8015:8000 claude zsh -c "cd /workspace/sleep-tracking && exec ./claude-or"'
 alias idp-or='JAIL_NAME=idp-or UPLOAD_DIR=/workspace/idp/uploads docker compose -f ~/Projects/docker-compose.yml run --rm claude zsh -c "cd /workspace/idp && exec ./claude-or"'
-alias snore-recorder='JAIL_NAME=snore-recorder UPLOAD_DIR=/workspace/snore-recorder/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8006:8000 claude zsh -c "cd /workspace/snore-recorder && exec claude"'
-alias openrouter-operator='JAIL_NAME=openrouter-operator UPLOAD_DIR=/workspace/openrouter-operator/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8016:8000 claude zsh -c "cd /workspace/openrouter-operator && exec claude"'
-alias teststuff='JAIL_NAME=teststuff UPLOAD_DIR=/workspace/teststuff/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8007:8000 claude zsh -c "cd /workspace/teststuff && exec claude"'
+alias snore-recorder='JAIL_NAME=snore-recorder UPLOAD_DIR=/workspace/snore-recorder/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8006:8000 claude zsh -c "cd /workspace/snore-recorder && exec claude"'
+alias openrouter-operator='JAIL_NAME=openrouter-operator UPLOAD_DIR=/workspace/openrouter-operator/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8016:8000 claude zsh -c "cd /workspace/openrouter-operator && exec claude"'
+alias teststuff='JAIL_NAME=teststuff UPLOAD_DIR=/workspace/teststuff/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8007:8000 claude zsh -c "cd /workspace/teststuff && exec claude"'
 # Browser games (Forgejo rasmus/games, spec-kit + playtest harness). A plain mono jail seated in
 # /workspace/games: the homelab CLAUDE.md/seat card never load there, so spec-kit runs without
 # homelab context. Served at games.homelab.teststuff.net (homelab argocd/resources/games/).
-alias games='JAIL_NAME=games UPLOAD_DIR=/workspace/games/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8008:8000 claude zsh -c "cd /workspace/games && exec claude"'
+alias games='JAIL_NAME=games UPLOAD_DIR=/workspace/games/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8008:8000 claude zsh -c "cd /workspace/games && exec claude"'
 # Kids' projects (Forgejo rasmus/kindergarten, rasmus/school): plain mono jails seated in each repo.
-alias kindergarten='JAIL_NAME=kindergarten UPLOAD_DIR=/workspace/kindergarten/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8009:8000 claude zsh -c "cd /workspace/kindergarten && exec claude"'
-alias school='JAIL_NAME=school UPLOAD_DIR=/workspace/school/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8010:8000 claude zsh -c "cd /workspace/school && exec claude"'
+alias kindergarten='JAIL_NAME=kindergarten UPLOAD_DIR=/workspace/kindergarten/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8009:8000 claude zsh -c "cd /workspace/kindergarten && exec claude"'
+alias school='JAIL_NAME=school UPLOAD_DIR=/workspace/school/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8010:8000 claude zsh -c "cd /workspace/school && exec claude"'
 # oracle STACK-JAIL (not the mono jail): scoped mounts + per-stack tokens + SA kubectl.
 # Shares the mono jail's login (.credentials.json mount) — no /login needed;
 # `oracle --login` exists only for re-auth edge cases (maps 54545, not while main runs).
@@ -38,7 +40,7 @@ alias circles='~/Projects/tools/stack-jail.sh circles'
 # local model-splitting shim; the MAIN model — fable — stays on the Anthropic subscription).
 # Slot map: homelab/.opencode-go.env; key: wallet `opencode-go-api-key`. Upload port 8012
 # so it can run alongside the native homelab session (8002).
-alias homelab-go='JAIL_NAME=homelab-go UPLOAD_DIR=/workspace/homelab/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8012:8000 claude zsh -c "cd /workspace/homelab && exec bash scripts/claude-go.sh"'
+alias homelab-go='JAIL_NAME=homelab-go UPLOAD_DIR=/workspace/homelab/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 127.0.0.1:8012:8000 claude zsh -c "cd /workspace/homelab && exec bash scripts/claude-go.sh"'
 # Native Codex with persistent homelab state and its own upload port.
 # First login: homelab-codex --login; resume: homelab-codex -- codex resume --last
 alias homelab-codex='~/Projects/tools/codex-jail.sh --mono --homelab-wallet --env-file ~/Projects/.env --project ~/Projects/homelab --name homelab-codex --port 8022'

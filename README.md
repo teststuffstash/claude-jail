@@ -13,6 +13,19 @@ its development lifecycle.
 
 Load the shortcuts with `source ~/Projects/.aliases`.
 
+The mono jail can edit that file, and a host shell that sources it runs the edit unseen at
+every start. To close that, source a pinned copy instead and let `jail-pin`
+([tools/pin-aliases.sh](tools/pin-aliases.sh)) update it after showing you the diff:
+
+```sh
+[ -f ~/.config/claude-jail/aliases.pinned ] && source ~/.config/claude-jail/aliases.pinned
+cmp -s ~/Projects/.aliases ~/.config/claude-jail/aliases.pinned 2>/dev/null \
+  || print -u2 "⚠ jail .aliases differs from the pinned copy — review with: jail-pin"
+```
+
+The pinned copy lives outside every jail mount. The launchers the aliases call are still read
+from `~/Projects` at launch.
+
 | Session | Runtime / provider route | Workspace |
 |---|---|---|
 | `main`, `homelab`, other project aliases | Claude Code, native Anthropic login | All Projects mounted; project aliases select a working directory |
@@ -28,7 +41,9 @@ wrappers are described under [Alternative Claude provider routes](#alternative-c
 
 ## Shared container and host setup
 
-The image uses `node:22-bookworm`. The non-root `node` user is remapped to the host
+The image uses `debian:trixie` with no Node runtime: Claude Code and Codex are native
+binaries, and a project that needs `node` declares it in its `devbox.json`. The non-root
+`node` user (the name is historical) is created with the host
 UID/GID so workspace writes retain host ownership. Passwordless sudo allows
 container package installation; those installs disappear when the container is
 removed. Put persistent image tools in [Dockerfile](Dockerfile), and use each
@@ -37,7 +52,7 @@ project's Devbox configuration for project tools.
 The host supplies Docker with Compose, the Projects checkout, and the shared
 `/nix` store. Codex's runtime env-file option requires Compose support for
 `docker compose run --env-from-file`. The image includes Claude Code, git, gh,
-tea, Python, zsh, sudo, and Devbox; the Codex target adds Codex from npm's **latest** tag.
+tea, Python, zsh, sudo, and Devbox; the Codex target adds the native Codex binary from the **latest** GitHub release.
 `.dockerignore` excludes sibling repositories and secrets from the image context.
 
 Docker is the jail boundary. Mono sessions can read/write all mounted Projects
@@ -107,6 +122,27 @@ and attempts to mint a bounded Kubernetes ServiceAccount token through host Devb
 Its initializer creates per-repository Git credentials and a shallow homelab clone;
 the host homelab checkout is not mounted into stack jails. Persistent Claude state
 is separate per stack, while the Claude subscription credential file is shared.
+
+### Stack launcher safeguards
+
+`tools/stack-jail.sh` mounts the host's own checkouts read-write, so it guards what a session
+could leave behind for the host. The ideas come from the work variant (see `CLAUDE.md`).
+
+- **One launch per stack and runtime.** A lock under `~/.local/state/claude-jail/<stack>/`
+  is held for the whole session. A lock whose holder is gone (a reboot, a closed terminal) is
+  taken over with a warning. `--second` takes no lock.
+- **`.git/hooks` is read-only in the jail** for every read-write stack repo: a hook written by
+  a session would run on the host. Install hooks (`pre-commit install`) from the host.
+- **Git audit at session end** ([tools/git_audit.py](tools/git_audit.py)): the launcher
+  snapshots each repo's `.git` before the session and reports what changed that host git or an
+  IDE would run: config keys other than branch upstreams, hooks, a replaced `.git`, a rebase
+  left in progress, repositories planted in the working tree. `.git/config` stays writable
+  because sessions set upstreams and worktrees all day. If the launcher dies before the audit,
+  the next launch of that stack reports it. The mono jail has no launcher and gets none of this.
+- **Tokens from a wallet.** In `.env.<stack>`, `<PREFIX>_PAT_CMD="<command>"` (or
+  `<PREFIX>_HOMELAB_TOKEN_CMD`) runs the command on the host and uses its output as the token,
+  so the value need not sit in the file. Set the value or the command, not both; a command that
+  fails or prints nothing stops the launch.
 
 ### Alternative Claude provider routes
 
@@ -206,7 +242,8 @@ tools/codex-jail.sh --project /path/to/repo --name my-repo
 [docker-compose.codex.yml](docker-compose.codex.yml) is standalone. Config is seeded once with ChatGPT-only login
 and file credential storage. Model selection retains the CLI default. Set
 `CODEX_VERSION` when building to override the default `latest` tag with a specific version.
-Docker may reuse the cached npm install layer; use a no-cache build to refresh it on later rebuilds.
+Docker may reuse the cached download layer; use a no-cache build to refresh it on later rebuilds.
+A version is the release number without the `rust-v` prefix (`CODEX_VERSION=0.167.2`).
 
 ## Persistent state and credentials
 
@@ -280,6 +317,9 @@ Both entrypoints start the stdlib Python upload server on container port **8000*
 project's `uploads/` inbox. Ensure that inbox is gitignored; move files out when they
 belong in a commit. Logs are at `/tmp/upload-server.log`. See
 [the upload README](tools/upload/README.md) for the API and manual operation.
+
+Every published port binds `127.0.0.1`: the upload server has no authentication, so it is
+reachable from the host's own browser only, never from the LAN.
 
 | Alias | Host upload port | Claude OAuth callback |
 |---|---|---|
