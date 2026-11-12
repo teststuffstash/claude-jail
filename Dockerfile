@@ -74,17 +74,28 @@ ENV SHELL=/bin/zsh
 COPY tools/jail-entrypoint.sh /usr/local/bin/jail-entrypoint.sh
 RUN chmod +x /usr/local/bin/jail-entrypoint.sh
 
-# Claude Code, native build: the installer verifies the binary against its release manifest
-# and puts it under ~/.local, which is not a mount, so it lives in the image. Latest at build
-# time; a rebuild is the update, so the in-container auto-updater is off (it would download
-# into the container on every session and lose it at exit). The download cache under ~/.claude
-# is dropped — that path is a bind mount at runtime. The /usr/local/bin link keeps `claude`
-# reachable from shells that reset PATH (login shells, sudo).
+# Claude Code, native build, pinned to homelab's version-set STAMP (homelab#2014 shape (a)): the
+# one version the worker (agent-base) and the coordinator/reviewer images bake too, so the three
+# claude images agree and the drift belt (`VersionSetMembersDisagree` / `VersionSetBehindPin`,
+# homelab argocd/resources/version-sets/) stays quiet. The stamp is read at BUILD time (the ADD
+# fetches master's lock; Docker re-checks it on every build), so a host rebuild IS the seat's
+# deploy edge — the belt only watches it. Never "latest": that is how the seat ran 2.1.301
+# against a 2.1.293 stamp. Override for a one-off: --build-arg CLAUDE_CODE_VERSION=<x.y.z>.
+# The installer takes the version, verifies the binary against that release's manifest and puts
+# it under ~/.local, which is not a mount, so it lives in the image; the in-container
+# auto-updater is off (it would move the seat off the stamp, into a container that loses it at
+# exit). The download cache under ~/.claude is dropped — that path is a bind mount at runtime.
+# The /usr/local/bin link keeps `claude` reachable from shells that reset PATH (login shells, sudo).
+ARG CLAUDE_CODE_VERSION=""
+ADD --chmod=644 https://raw.githubusercontent.com/teststuffstash/homelab/master/version-sets/devbox.lock /opt/version-sets.lock
 USER node
-RUN curl -fsSL -o /tmp/claude-install.sh https://claude.ai/install.sh && \
-    bash /tmp/claude-install.sh && \
+RUN CLAUDE_CODE_VERSION="${CLAUDE_CODE_VERSION:-$(jq -er '.packages | to_entries[] | select(.key | startswith("claude-code@")) | .value.version' /opt/version-sets.lock)}" && \
+    test -n "$CLAUDE_CODE_VERSION" && \
+    echo "version set: claude-code ${CLAUDE_CODE_VERSION}" && \
+    curl -fsSL -o /tmp/claude-install.sh https://claude.ai/install.sh && \
+    bash /tmp/claude-install.sh "$CLAUDE_CODE_VERSION" && \
     rm -rf /tmp/claude-install.sh /home/node/.claude && \
-    /home/node/.local/bin/claude --version
+    /home/node/.local/bin/claude --version | grep -qF "$CLAUDE_CODE_VERSION"
 USER root
 RUN ln -s /home/node/.local/bin/claude /usr/local/bin/claude
 ENV PATH="/home/node/.local/bin:${PATH}" \

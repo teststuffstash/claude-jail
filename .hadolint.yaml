@@ -2,6 +2,7 @@
 ignored:
   # DL3008 "pin apt versions": the image's inputs are "latest at build time, rebuild to update"
   # by decision — Debian versions are pinned by the base tag and vanish from the mirrors within
-  # weeks, and Claude Code and Codex should be current on every rebuild.
-  # What IS pinned on purpose (tea + sha256, the devbox launcher) carries its reason inline.
+  # weeks, and Codex should be current on every rebuild.
+  # What IS pinned on purpose (Claude Code to homelab's version set, tea + sha256, the devbox
+  # launcher) carries its reason inline.
   - DL3008
