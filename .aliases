@@ -23,6 +23,9 @@ alias teststuff='JAIL_NAME=teststuff UPLOAD_DIR=/workspace/teststuff/uploads doc
 # /workspace/games: the homelab CLAUDE.md/seat card never load there, so spec-kit runs without
 # homelab context. Served at games.homelab.teststuff.net (homelab argocd/resources/games/).
 alias games='JAIL_NAME=games UPLOAD_DIR=/workspace/games/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8008:8000 claude zsh -c "cd /workspace/games && exec claude"'
+# Kids' projects (Forgejo rasmus/kindergarten, rasmus/school): plain mono jails seated in each repo.
+alias kindergarten='JAIL_NAME=kindergarten UPLOAD_DIR=/workspace/kindergarten/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8009:8000 claude zsh -c "cd /workspace/kindergarten && exec claude"'
+alias school='JAIL_NAME=school UPLOAD_DIR=/workspace/school/uploads docker compose -f ~/Projects/docker-compose.yml run --rm -p 8010:8000 claude zsh -c "cd /workspace/school && exec claude"'
 # oracle STACK-JAIL (not the mono jail): scoped mounts + per-stack tokens + SA kubectl.
 # Shares the mono jail's login (.credentials.json mount) — no /login needed;
 # `oracle --login` exists only for re-auth edge cases (maps 54545, not while main runs).
