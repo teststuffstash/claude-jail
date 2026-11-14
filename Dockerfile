@@ -112,19 +112,23 @@ CMD ["claude"]
 # Codex reuses the jail toolchain, with its own entrypoint and persistent state.
 FROM jail-base AS codex
 USER root
-# Codex, native build: the static musl binary from the GitHub release (the npm package only
-# wraps this same binary). CODEX_VERSION=latest follows the newest release at build time;
-# a version (0.167.2) pins it. ripgrep: the npm package vendored one for Codex's file search.
+# Codex, native build: the release's full `codex-package` (what the npm package installs), not
+# the bare `codex-<target>` binary — Codex spawns sibling helpers (`codex-code-mode-host` runs
+# every tool call, `codex-exec-server`) and uses the bundled codex-path/ (rg) and
+# codex-resources/ (bwrap). The bare binary alone fails every tool call with "failed to spawn
+# code-mode host". Unpacked whole under /opt/codex; bin/* linked into /usr/local/bin.
+# CODEX_VERSION=latest follows the newest release at build time; a version (0.169.0) pins it.
+# ripgrep stays for interactive use (Codex brings its own).
 ARG CODEX_VERSION=latest
 RUN apt-get update && apt-get install -y --no-install-recommends ripgrep && rm -rf /var/lib/apt/lists/* && \
-    arch="$(uname -m)" && asset="codex-${arch}-unknown-linux-musl" && \
-    if [ "${CODEX_VERSION}" = latest ]; then url="https://github.com/openai/codex/releases/latest/download/${asset}.tar.gz"; \
-    else url="https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/${asset}.tar.gz"; fi && \
+    asset="codex-package-$(uname -m)-unknown-linux-musl.tar.gz" && \
+    if [ "${CODEX_VERSION}" = latest ]; then url="https://github.com/openai/codex/releases/latest/download/${asset}"; \
+    else url="https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/${asset}"; fi && \
     curl -fsSL -o /tmp/codex.tar.gz "${url}" && \
-    tar -xzf /tmp/codex.tar.gz -C /tmp "${asset}" && \
-    install -m 0755 "/tmp/${asset}" /usr/local/bin/codex && \
-    rm -f /tmp/codex.tar.gz "/tmp/${asset}" && \
-    codex --version
+    mkdir -p /opt/codex && tar -xzf /tmp/codex.tar.gz -C /opt/codex --no-same-owner && \
+    rm -f /tmp/codex.tar.gz && \
+    for b in /opt/codex/bin/*; do ln -sf "${b}" "/usr/local/bin/$(basename "${b}")"; done && \
+    codex --version && test -x /usr/local/bin/codex-code-mode-host
 COPY tools/codex-entrypoint.sh /usr/local/bin/codex-entrypoint.sh
 COPY tools/codex-context.py /opt/jail/codex-context.py
 COPY tools/mcp-register.py /opt/jail/mcp-register.py
