@@ -52,7 +52,7 @@ project's Devbox configuration for project tools.
 The host supplies Docker with Compose, the Projects checkout, and the shared
 `/nix` store. Codex's runtime env-file option requires Compose support for
 `docker compose run --env-from-file`. The image includes Claude Code, git, gh,
-tea, Python, zsh, sudo, and Devbox; the Codex target adds the native Codex binary from the **latest** GitHub release.
+tea, Python, sudo, and Devbox (login shell bash); the Codex target adds the full native Codex package from the **latest** GitHub release.
 `.dockerignore` excludes sibling repositories and secrets from the image context.
 
 Docker is the jail boundary. Mono sessions can read/write all mounted Projects
@@ -236,7 +236,7 @@ tools/codex-jail.sh --project /path/to/repo --name my-repo
 | `--port PORT` | Host loopback upload port; default 8021 |
 | `--env-file FILE` | Explicit runtime environment; other invocations do not automatically load Claude's `.env` |
 | `--homelab-wallet` | Mount the existing wallet and management SSH cache and persist other regenerated service files |
-| `--shell` | Open zsh; Codex commands manually typed there do not receive the host launcher's bypass flag |
+| `--shell` | Open bash; Codex commands manually typed there do not receive the host launcher's bypass flag |
 | `-- COMMAND…` | Forward a command and its arguments to the container |
 
 [docker-compose.codex.yml](docker-compose.codex.yml) is standalone. Config is seeded once with ChatGPT-only login
@@ -286,9 +286,11 @@ container-local `GIT_CONFIG_GLOBAL` that includes the mounted `~/.gitconfig`. Gi
 repositories stay unsigned. Stack jails get none of this: the key reaches every personal
 Forgejo repository, so a stack needing one gets a per-repository deploy key.
 
-Claude jails persist zsh history (mono: `.claude-data.zsh_history`; stack:
-`.claude-data-<stack>.zsh_history`) but mount no host shell dotfiles (plain zsh, no `.zshrc`).
-Codex does not currently persist zsh history.
+Jails run bash (login shell and `SHELL`), the shell the Bash tool and Codex run commands
+through. Claude jails persist bash history (mono: `.claude-data.bash_history`; stack:
+`.claude-data-<stack>.bash_history`) but mount no host shell dotfiles (plain bash, Debian's
+skeleton `.bashrc`). Codex does not currently persist shell history. The host shell is
+untouched: `.aliases` and `jail-pin` still target the host's `~/.zshrc`.
 
 ## Startup instructions and skills
 

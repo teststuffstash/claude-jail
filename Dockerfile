@@ -11,7 +11,7 @@ ARG HOST_GID=1000
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      ca-certificates zsh git jq curl gpg tini python3 sudo xz-utils ipmitool procps && \
+      ca-certificates git jq curl gpg tini python3 sudo xz-utils ipmitool procps && \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
     chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
@@ -32,11 +32,13 @@ RUN curl -fsSL "https://dl.gitea.com/tea/${TEA_VERSION}/tea-${TEA_VERSION}-linux
     chmod 0755 /usr/local/bin/tea
 
 # The 'node' user, with the host UID/GID so files created in mounted volumes are owned by the
-# host user; login shell zsh. The NAME is history (the image used to be node:22, whose user
-# this was): /home/node is in every mount target, launcher and saved permission rule, so it
-# stays. A host GID Debian already uses (macOS staff = 20 = dialout) reuses that group.
+# host user. Login shell bash: the Bash tool and Codex run every command through it, and agents
+# write bash (zsh's no-word-splitting caused real bugs; taken from the work variant, f028a0c).
+# The NAME is history (the image used to be node:22, whose user this was): /home/node is in
+# every mount target, launcher and saved permission rule, so it stays. A host GID Debian
+# already uses (macOS staff = 20 = dialout) reuses that group.
 RUN (getent group "${HOST_GID}" >/dev/null || groupadd -g "${HOST_GID}" node) && \
-    useradd -l -u "${HOST_UID}" -g "${HOST_GID}" -m -s /bin/zsh node
+    useradd -l -u "${HOST_UID}" -g "${HOST_GID}" -m -s /bin/bash node
 
 # Passwordless sudo for 'node' so software can be apt-installed mid-session.
 RUN echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/node && \
@@ -69,7 +71,7 @@ RUN groupadd -r nixbld && \
       useradd -r -g nixbld -G nixbld -d /var/empty -s /usr/sbin/nologin -c "Nix build user $i" "nixbld$i"; \
     done
 
-ENV SHELL=/bin/zsh
+ENV SHELL=/bin/bash
 
 COPY tools/jail-entrypoint.sh /usr/local/bin/jail-entrypoint.sh
 RUN chmod +x /usr/local/bin/jail-entrypoint.sh

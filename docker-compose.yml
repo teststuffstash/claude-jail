@@ -47,7 +47,7 @@ services:
       # the jail can use its own author name/email. Edit .claude-data.gitconfig.
       - ${HOME}/Projects/.claude-data.gitconfig:/home/node/.gitconfig
       # Mono-jail shell history (stack jails get a per-stack file from tools/stack-jail.sh).
-      - ${HOME}/Projects/.claude-data.zsh_history:/home/node/.zsh_history
+      - ${HOME}/Projects/.claude-data.bash_history:/home/node/.bash_history
       # Shared Nix store so Devbox tooling (per-project devbox.json) works identically in
       # the jail and on the host. Requires Nix/Devbox installed on the host (it provides /nix).
       - /nix:/nix

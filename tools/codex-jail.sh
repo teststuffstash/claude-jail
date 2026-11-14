@@ -30,7 +30,7 @@ while (($#)); do
     --mono) mono=1; shift;;
     --homelab-wallet) wallet=1; shift;;
     --login) command=(codex login --device-auth); shift;;
-    --shell) command=(zsh); shift;;
+    --shell) command=(bash); shift;;
     --) shift; (($#)) || { usage >&2; exit 2; }; command=("$@"); break;;
     -h|--help) usage; exit 0;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 2;;
