@@ -20,8 +20,8 @@ set_env HOST_GID "$(id -g)"
 # otherwise docker creates an empty directory in their place.
 CONFIG_FILE="$HOME/Projects/.claude-data.json"
 [ -f "$CONFIG_FILE" ] || echo '{}' > "$CONFIG_FILE"
-ZSH_HIST="$HOME/Projects/.claude-data.zsh_history"
-[ -f "$ZSH_HIST" ] || touch "$ZSH_HIST"
+BASH_HIST="$HOME/Projects/.claude-data.bash_history"
+[ -f "$BASH_HIST" ] || touch "$BASH_HIST"
 
 # Jail-only git identity, mounted to /home/node/.gitconfig. Kept separate from
 # the host ~/.gitconfig so jail commits can use a different author if desired.

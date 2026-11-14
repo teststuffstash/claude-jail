@@ -154,7 +154,7 @@ fi
 mkdir -p "$STATE_DIR"
 if [[ $RUNTIME == claude ]]; then
   [ -s "$CLAUDE_JSON" ] || echo '{}' > "$CLAUDE_JSON"
-  touch "$PROJECTS/.claude-data-$STACK.zsh_history"
+  touch "$PROJECTS/.claude-data-$STACK.bash_history"
 fi
 # Cross-jail handoff channel: only this stack's subtree is mounted.
 mkdir -p "$PROJECTS/.handoff/$STACK"/{inbox,doing,done}
@@ -320,7 +320,7 @@ else
   VOLS+=(
     -v "$STATE_DIR:/home/node/.claude"
     -v "$CLAUDE_JSON:/home/node/.claude.json"
-    -v "$PROJECTS/.claude-data-$STACK.zsh_history:/home/node/.zsh_history"
+    -v "$PROJECTS/.claude-data-$STACK.bash_history:/home/node/.bash_history"
   )
 fi
 AUDIT_DIRS=()
@@ -416,4 +416,4 @@ run_session docker compose -f "$PROJECTS/docker-compose.yml" run --rm \
   -e UPLOAD_DIR -e JAIL_NAME -e STACK_JAIL_SECOND -e STACK_NAME -e STACK_PAT -e STACK_HOMELAB_TOKEN -e STACK_REPOS \
   -e STACK_KUBE_TOKEN -e STACK_KUBE_SERVER -e STACK_KUBE_CA -e STACK_KUBE_NS \
   stack \
-  zsh -c "source /workspace/tools/stack-jail-init.sh && cd $MAIN_DIR && exec claude --dangerously-skip-permissions"
+  bash -c "source /workspace/tools/stack-jail-init.sh && cd $MAIN_DIR && exec claude --dangerously-skip-permissions"

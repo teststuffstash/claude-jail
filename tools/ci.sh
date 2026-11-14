@@ -9,8 +9,7 @@ cd "$(dirname "$0")/.."
 
 lint() {
   local sh_files py_files
-  # tools/stack-jail-init.sh has no shebang (it is sourced under zsh, see its header):
-  # bash is the closest dialect shellcheck knows; zsh word-splitting still needs a human eye.
+  # tools/stack-jail-init.sh has no shebang (it is sourced, under bash): -s bash covers it.
   mapfile -t sh_files < <(git ls-files '*.sh')
   mapfile -t py_files < <(git ls-files '*.py')
   shellcheck -x -s bash "${sh_files[@]}"
