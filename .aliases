@@ -44,3 +44,7 @@ alias homelab-go='JAIL_NAME=homelab-go UPLOAD_DIR=/workspace/homelab/uploads doc
 # Native Codex with persistent homelab state and its own upload port.
 # First login: homelab-codex --login; resume: homelab-codex -- codex resume --last
 alias homelab-codex='~/Projects/tools/codex-jail.sh --mono --homelab-wallet --env-file ~/Projects/.env --project ~/Projects/homelab --name homelab-codex --port 8022'
+# Native Codex seated in life, scoped: mounts ONLY ~/Projects/life (no --mono), own state in
+# .codex-jail/life-codex. No Forgejo key, so it commits locally and cannot push.
+# First login: life-codex --login; resume: life-codex -- codex resume --last
+alias life-codex='~/Projects/tools/codex-jail.sh --project ~/Projects/life --name life-codex --port 8023'

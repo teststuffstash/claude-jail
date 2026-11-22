@@ -34,6 +34,7 @@ from `~/Projects` at launch.
 | `oracle`, `sleep-jail`, `platform-jail`, `circles` | Claude Code with stack-scoped provisioning | Selected repositories and read-only extras |
 | `oracle-codex` | Native Codex with stack-scoped provisioning | Same Oracle repository/credential scope as `oracle` |
 | `homelab-codex` | Native Codex, ChatGPT subscription login | All Projects mounted; working directory `/workspace/homelab` |
+| `life-codex` | Native Codex, ChatGPT subscription login | Only `life/` mounted at `/workspace/life`; no Forgejo key, so no push |
 | `tools/codex-jail.sh --project DIR` | Native Codex | Selected project only, unless `--mono` is supplied |
 
 The aliases and launchers are the source of truth for paths and ports. Provider
@@ -343,6 +344,7 @@ reachable from the host's own browser only, never from the LAN.
 | `circles` | 8020 | With `--login` |
 | `oracle-codex` | 8037 | Device login; no callback port |
 | `homelab-codex` | 8022 | Device login; no callback port |
+| `life-codex` | 8023 | Device login; no callback port |
 
 Open `http://localhost:<port>`. A generic Codex launch defaults to **8021**.
 Codex binds the published port to `127.0.0.1`; existing Claude aliases use Docker's
