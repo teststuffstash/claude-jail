@@ -78,3 +78,13 @@ catalog, never repeat a remembered status** (Postgres sat in this very sentence 
 - **Merge into a PR branch with git's default message** (`git merge origin/master`, no `-m`).
   The loop's scripts recognize a merge commit by that title; a hand-titled merge reads as new
   content to some and as a merge to others, and the PR's reviews stall.
+- **Isolate parallel work in a local clone, never a git worktree.** Worktrees share the main
+  repo's branch refs, so a subagent's `checkout`/`commit` can move the operator's checkout or
+  land on another session's branch (homelab#428: four escapes in one day, 2026-08-13). So:
+  never pass `isolation: "worktree"` to the Agent tool, never `EnterWorktree`, never
+  `git worktree add`. Instead: `git clone <checkout> <dir>` in your scratchpad (git hardlinks
+  on the same filesystem and copies otherwise; `--local` fails across filesystems), then
+  `git remote rename origin local && git remote add origin <github-url> && git fetch origin`
+  and cut the branch from `origin/master`. A fresh clone's `origin` IS the shared checkout
+  (pushing there writes a stray ref into it) and its master carries the checkout's unpushed
+  commits; after the rename, `origin` means GitHub as everywhere else.
