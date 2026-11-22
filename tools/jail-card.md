@@ -75,3 +75,6 @@ catalog, never repeat a remembered status** (Postgres sat in this very sentence 
   `bash /workspace/homelab/scripts/pr-wait.sh <pr> [<pr> …] --repo teststuffstash/<repo>`
   run in the BACKGROUND (`--no-arm` if auto-merge must not be armed). Several PRs = one
   call. No other GitHub polling faster than once a minute.
+- **Merge into a PR branch with git's default message** (`git merge origin/master`, no `-m`).
+  The loop's scripts recognize a merge commit by that title; a hand-titled merge reads as new
+  content to some and as a merge to others, and the PR's reviews stall.
