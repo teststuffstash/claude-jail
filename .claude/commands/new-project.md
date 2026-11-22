@@ -43,7 +43,8 @@ Then the jail-local half (this repo's ownership):
 3. **Main-repo content**: CLAUDE.md, `.agents/{fix.yaml,review.md}`, devbox `ci` + `scan-secrets`,
    merge-path caller workflows — copy the shapes from **oracle-fleet** (the reference stack) and
    adapt; a `stack-template` repo is the planned collapse of this step.
-4. **Jail bookkeeping**: append `<main>/` and `<iac>/` to `/workspace/.gitignore`.
+4. **Jail bookkeeping**: none for git — the jail's top-level `.gitignore` is an allowlist, so a
+   new clone is ignored without a listing.
 
 **Definition of done — loop until green:**
 
@@ -68,7 +69,7 @@ devbox.json (copy any recent project's), `.claude/settings.local.json` with
 `{"permissions":{"defaultMode":"bypassPermissions"}}`, remote
 `https://github.com/teststuffstash/<name>.git` (plain URL — the mono-jail entrypoint's git
 credential store supplies the PAT; never embed `${GH_TOKEN}` in the remote, FU-002), push. Then the
-mono-jail alias (next free port) + jail `.gitignore` entry, as in Kind 1 steps 2/4 but with the
+mono-jail alias (next free port), as in Kind 1 step 2 but with the
 `claude` compose service pattern — copy an existing `.aliases` line.
 
 ## Kind 3 — Forgejo repo
@@ -85,7 +86,7 @@ Forge mechanics (jail-owned — Forgejo is not in homelab's GitHub IaC):
   `git remote add origin git@forgejo.teststuff.net:<owner>/<name>.git` and push with
   `GIT_SSH_COMMAND="ssh -i ~/.claude/homelab-forgejo/id_ed25519 -o StrictHostKeyChecking=accept-new"`.
 
-Local setup + alias + jail `.gitignore`: same as Kind 2.
+Local setup + alias: same as Kind 2.
 
 ## Finish
 

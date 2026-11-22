@@ -29,7 +29,8 @@ seat card by design.
 - The image is `debian:trixie` with native Claude Code and Codex binaries and no Node runtime;
   the user is still called `node` because `/home/node` is in every mount and launcher.
 - This directory doubles as the host's `~/Projects`: project repos are cloned
-  side-by-side and gitignored here (see `.gitignore`'s cloned-projects block).
+  side-by-side and gitignored here: the top-level `.gitignore` is an allowlist of this
+  repo's own files, so no clone needs listing (a new top-level repo file needs a `!` line).
 - The **work variant** (`RasmusSoot/claude-jail-work`, forked from here at `98051c0`) is a
   separate repo with its own Claude and its own rules. Changes move by **pull only**: each side
   reads the other and takes what it likes; neither writes to the other. Its clone at
