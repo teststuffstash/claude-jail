@@ -11,7 +11,7 @@ ARG HOST_GID=1000
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-      ca-certificates git jq curl gpg tini python3 sudo xz-utils ipmitool procps && \
+      ca-certificates git jq curl gpg gpg-agent openssh-client tini python3 sudo xz-utils ipmitool procps && \
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
         | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
     chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
