@@ -62,8 +62,10 @@ handoff-G4 — now the documented shape.)
 
 **Durable records from a SECOND jail:** a secondary homelab session (`/second-jail`) may work and
 answer handoff tasks but owns no shared record (tracker, meta-state, TICK-LOG). It writes the
-`## Result`, moves the file to `done/`, and hands the durable record — the FU/issue the task
-deserves — to the primary seat in its final message instead of filing it.
+`## Result`, moves the file to `done/`, and carries the durable record the task deserves in its
+one-time wind-down handoff to the primary seat: one file of typed records in `.handoff/seat/`
+(mono jails only; one-way, nothing comes back). The types are homelab's:
+`homelab/.claude/skills/handoff/seat-records.md`.
 
 ## Boundaries
 
