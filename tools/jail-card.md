@@ -1,14 +1,19 @@
 # Jail card — container ground rules for every jail session
 
 <!-- The ONE versioned home for jail-session ground rules (claude-jail#1, homelab FU-117).
+Runtime-neutral: it is read by Claude Code AND Codex sessions, so a rule here names the
+behaviour, not one runtime's tool. What only one runtime needs goes in its runtime file,
+tools/jail-card.d/<runtime>.md, which is appended right after this card.
 Composed into the session at container start — never hand-pasted, never edited at the
 composition target (edit THIS file):
-  - mono jail: tools/jail-entrypoint.sh writes it to /workspace/CLAUDE.local.md, and
-    additionally composes homelab's agents/jail-seat-card.md to
-    /workspace/homelab/CLAUDE.local.md (homelab-scoped, seat sessions only);
-  - stack jail: tools/stack-jail-init.sh prepends its rendered per-stack env card and
-    writes the pair to /workspace/CLAUDE.local.md (container-local). Stack jails get NO
-    homelab seat card by design — see the seat card's header for why. -->
+  - Claude, mono jail: tools/jail-entrypoint.sh writes card + claude.md to
+    /workspace/CLAUDE.local.md, and additionally composes homelab's agents/jail-seat-card.md
+    to /workspace/homelab/CLAUDE.local.md (homelab-scoped, seat sessions only);
+  - Claude, stack jail: tools/stack-jail-init.sh prepends its rendered per-stack env card and
+    writes the whole to /workspace/CLAUDE.local.md (container-local). Stack jails get NO
+    homelab seat card by design — see the seat card's header for why;
+  - Codex (any jail): tools/codex-context.py writes card + codex.md, after its rendered
+    session facts (and a stack jail's env card), to the global ~/.codex/AGENTS.md. -->
 
 You are running inside a Docker container with full permissions. All actions are
 pre-approved — do not ask for confirmation before running commands, editing files, or
@@ -17,7 +22,7 @@ installing packages.
 ## Environment
 
 - Container base: `debian:trixie`, running as the `node` user (host UID/GID). There is
-  **no Node runtime in the image** — Claude Code is a native binary; a project that needs
+  **no Node runtime in the image** — Claude Code and Codex are native binaries; a project that needs
   `node`/`npm`/`npx` declares `nodejs` in its `devbox.json`
 - The `node` user has **passwordless sudo** — install packages directly with
   `sudo apt-get install ...` (installs are ephemeral; add to claude-jail's `Dockerfile`
@@ -27,9 +32,7 @@ installing packages.
   `sudo apt`/`curl` installs. The `/nix` store is bind-mounted from the host, so the same
   `devbox.json` works in the jail and on the host (and persists across rebuilds).
   `devbox.lock` is committed for deterministic versions.
-- Memory and session history: persisted at `/home/node/.claude`, bind-mounted to the host
-  (`.claude-data/` for the mono jail, `.claude-data-<stack>/` per stack jail)
-- **You have a browser: the `browser` MCP server** (tools `mcp__browser__*`) — a headless
+- **You have a browser: the `browser` MCP server** — a headless
   Chromium driven by Playwright MCP, running as a sidecar container shared by every jail on
   this host and reachable only from jails (`tools/jail-browser.sh` on the host manages it).
   Use it for pages a plain `curl` cannot read: JavaScript SPAs, dashboards, forms. Each MCP
@@ -41,6 +44,7 @@ installing packages.
   `~/Projects` at `/workspace` (read-write). A **stack jail** mounts only its stack's
   repos plus `tools/`, and shallow-clones homelab inside the container — its session card
   (prepended above this one) carries the per-stack facts: credentials, kubectl, ports.
+  A Codex jail launched with `--project` and no `--mono` mounts only that one project.
 
 ## Homelab platform services (S3, DB, dashboards, …)
 
@@ -78,3 +82,13 @@ catalog, never repeat a remembered status** (Postgres sat in this very sentence 
 - **Merge into a PR branch with git's default message** (`git merge origin/master`, no `-m`).
   The loop's scripts recognize a merge commit by that title; a hand-titled merge reads as new
   content to some and as a merge to others, and the PR's reviews stall.
+- **Isolate parallel work in a local clone, never a git worktree.** Worktrees share the main
+  repo's branch refs, so a subagent's `checkout`/`commit` can move the operator's checkout or
+  land on another session's branch (homelab#428: four escapes in one day, 2026-08-13). So:
+  never `git worktree add`, and never a runtime's built-in worktree option (the runtime
+  file below names any yours has). Instead: `git clone <checkout> <dir>` in your scratchpad
+  (git hardlinks on the same filesystem and copies otherwise; `--local` fails across
+  filesystems), then `git remote rename origin local && git remote add origin <github-url> &&
+  git fetch origin` and cut the branch from `origin/master`. A fresh clone's `origin` IS the
+  shared checkout (pushing there writes a stray ref into it) and its master carries the
+  checkout's unpushed commits; after the rename, `origin` means GitHub as everywhere else.

@@ -22,8 +22,10 @@ python3 /workspace/tools/upload/upload.py \
 # without its card is a real defect, not a default.
 if [ -z "${STACK_NAME:-}" ]; then
   if [ -f /workspace/tools/jail-card.md ]; then
-    { echo '<!-- composed at container start by tools/jail-entrypoint.sh from tools/jail-card.md — edit THAT file, not this one -->'
+    { echo '<!-- composed at container start by tools/jail-entrypoint.sh from tools/jail-card.md + tools/jail-card.d/claude.md — edit THOSE files, not this one -->'
       cat /workspace/tools/jail-card.md
+      cat /workspace/tools/jail-card.d/claude.md 2>/dev/null \
+        || echo "jail-entrypoint: tools/jail-card.d/claude.md missing — card composed WITHOUT the Claude runtime file" >&2
     } > /workspace/CLAUDE.local.md
   else
     echo "jail-entrypoint: tools/jail-card.md missing — this session has NO container ground-rules card" >&2

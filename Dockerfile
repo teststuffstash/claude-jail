@@ -133,6 +133,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ripgrep && rm -
     codex --version && test -x /usr/local/bin/codex-code-mode-host
 COPY tools/codex-entrypoint.sh /usr/local/bin/codex-entrypoint.sh
 COPY tools/codex-context.py /opt/jail/codex-context.py
+COPY tools/jail-card.md /opt/jail/jail-card.md
+COPY tools/jail-card.d/codex.md /opt/jail/jail-card.d/codex.md
 COPY tools/mcp-register.py /opt/jail/mcp-register.py
 COPY tools/codex-transcripts-sync.sh /opt/jail/codex-transcripts-sync.sh
 COPY tools/upload/upload.py /opt/jail/upload.py
