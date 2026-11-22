@@ -126,7 +126,7 @@ fi
 {
   cat <<EOF
 # ${STACK_NAME:-stack} stack jail — session card
-<!-- rendered at session start by tools/stack-jail-init.sh from the STACK_* env — edit the renderer (or tools/jail-card.md below), not this file -->
+<!-- rendered at session start by tools/stack-jail-init.sh from the STACK_* env — edit the renderer (or tools/jail-card.md and tools/jail-card.d/ below), not this file -->
 
 ${_sj_second:-}
 - **Stack: ${STACK_NAME:-?}.** Only this stack's repos are mounted under \`/workspace\`, plus any read-only extras (private repos, or another stack's repos mounted as prior art — read them before redoing what they already solved; changes there go through that stack's jail) — \`ls /workspace\` shows the full set.
@@ -141,6 +141,10 @@ ${_sj_second:-}
 EOF
   if [ -f /workspace/tools/jail-card.md ]; then
     cat /workspace/tools/jail-card.md
+    # The runtime file (tools/jail-card.d/). Codex reads only the prefix above the first
+    # `---` from this file (tools/codex-context.py) and appends its own runtime file.
+    cat /workspace/tools/jail-card.d/claude.md 2>/dev/null \
+      || _sj_warn "tools/jail-card.d/claude.md missing — card composed WITHOUT the Claude runtime file"
   else
     _sj_warn "tools/jail-card.md missing — session card composed WITHOUT the container ground rules"
     echo "(tools/jail-card.md was missing at composition time — container ground rules absent)"
